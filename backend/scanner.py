@@ -58,27 +58,40 @@ POSTER_FILES = {
 
 # קידומות מפיצים להסרה
 RELEASE_PREFIXES = [
-    r'^(?:1080p|720p|480p|360p)[_\s]+נתי[_\s]+מדיה[_\s]+',
+    r'^(?:1080p|720p|480p|360p)[_\s]+',
+    r'^[sS][rR][_\s]+',
+    r'^[sS]\.[rR][_\s]+',
     r'^נתי[_\s]+מדיה[_\s]+',
     r'^יוסי[_\s]+סרטים[_\s]+',
     r'^לולו[_\s]+סרטים[_\s]+',
-    r'^קינג[_\s]+סרט\s*',
-    r'^סדרות\s+',
+    r'^קינג[_\s]+סרט[_\s]*',
+    r'^סדרות[_\s]+',
     r'^אבי[_\s]+סרטים\s*-\s*',
     r'^ISrTeLeG\s*-\s*',
+    r'^טלגרם[_\s]+',
 ]
 
 def clean_series_name(name: str) -> str:
     name = name.strip()
-    for p in RELEASE_PREFIXES:
-        name = re.sub(p, '', name, flags=re.IGNORECASE).strip()
+    changed = True
+    while changed:
+        changed = False
+        for p in RELEASE_PREFIXES:
+            new_name = re.sub(p, '', name, flags=re.IGNORECASE).strip()
+            if new_name != name:
+                name = new_name
+                changed = True
+
     name = re.sub(r'[_\.]+', ' ', name).strip()
-    
     name_lower = name.lower()
-    for alias, standard in SERIES_ALIASES.items():
+
+    for alias, standard in sorted(SERIES_ALIASES.items(), key=lambda x: -len(x[0])):
         if name_lower == alias.lower() or name_lower.startswith(alias.lower()):
             return standard
         if standard.replace('"', '').replace("'", "").replace(" ", "") == name.replace('"', '').replace("'", "").replace(" ", ""):
+            return standard
+        pattern = r'(?:^|[\s_\.-])' + re.escape(alias.lower()) + r'(?:$|[\s_\.-])'
+        if re.search(pattern, name_lower):
             return standard
 
     return name
@@ -89,8 +102,14 @@ def sanitize_clean_string(clean: str) -> str:
     clean = re.sub(r'[\s_]+(?:1080[pP]|720[pP]|480[pP]|360[pP])\b', '', clean)
     clean = re.sub(r'\b(?:1080[pP]|720[pP]|480[pP]|360[pP])\b', '', clean)
     # מסיר קידומות נפוצות
-    for p in RELEASE_PREFIXES:
-        clean = re.sub(p, '', clean, flags=re.IGNORECASE).strip()
+    changed = True
+    while changed:
+        changed = False
+        for p in RELEASE_PREFIXES:
+            new_clean = re.sub(p, '', clean, flags=re.IGNORECASE).strip()
+            if new_clean != clean:
+                clean = new_clean
+                changed = True
     # מסיר תגיות נוספות כמו ISrTeLeG, קינג סרט, אחרון לעונה
     clean = re.sub(r'[\s_]+(?:ISrTeLeG|קינג סרט|אחרון_לעונה|אחרון לעונה)', '', clean, flags=re.IGNORECASE)
     # מסיר סיומות כפילות כגון (1), (2)
