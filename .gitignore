@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# Local media files (הגנה מוחלטת שלא יועלו סרטים או קבצי וידאו ל-GitHub)
+*.mp4
+*.mkv
+*.avi
+*.mov
+*.webm
+*.ts
+*.m4v
+
+# Local app data & watch history
+backend/watched.json
+watched.json
+
+# System & IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db
+Desktop.ini
+.DS_Store
