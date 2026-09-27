@@ -16,7 +16,7 @@
     <div class="pastel-bubble bubble-mint"></div>
 
     <div class="app-wrap">
-        <!-- סרגל עליון מתוק וכיפי (ללא כפתורים מיותרים משמאל) -->
+        <!-- סרגל עליון נקי ומתוק -->
         <header class="top-nav">
             <div class="brand">
                 <div class="brand-avatar">🍿</div>
@@ -26,124 +26,94 @@
                 </div>
             </div>
 
-            <!-- סטטיסטיקות סוכרייה -->
-            <div class="candy-stats">
-                <div class="candy-pill pill-pink">
-                    <span class="candy-icon">🎬</span>
-                    <span class="candy-val" id="stat-series">0</span>
-                    <span class="candy-lbl">סדרות</span>
-                </div>
-                <div class="candy-pill pill-purple">
-                    <span class="candy-icon">🍿</span>
-                    <span class="candy-val" id="stat-episodes">0</span>
-                    <span class="candy-lbl">פרקים</span>
-                </div>
-                <div class="candy-pill pill-mint">
-                    <span class="candy-icon">💖</span>
-                    <span class="candy-val" id="stat-watched">0</span>
-                    <span class="candy-lbl">נצפו</span>
-                </div>
-            </div>
-        </header>
-
-        <!-- אזור חיפוש וטאבים פסטליים -->
-        <section class="search-and-filters">
+            <!-- חיפוש מהיר במרכז/ימין -->
             <div class="pastel-search">
                 <span class="search-emoji">🔍</span>
                 <input type="text" id="search-input" placeholder="חפשי סדרה... (האי, שכונה, חצויה, פלמ''ח...)" autocomplete="off">
                 <button id="clear-search" class="clear-btn hidden">✕</button>
             </div>
+        </header>
 
+        <!-- טאבים פסטליים לסינון -->
+        <section class="filter-section">
             <div class="filter-tabs">
-                <button class="pastel-tab active" data-filter="all">הכל ✨</button>
+                <button class="pastel-tab active" data-filter="all">כל הסדרות ✨</button>
+                <button class="pastel-tab pill-fav-tab" data-filter="favorites">מועדפים שאהבתי ⭐</button>
                 <button class="pastel-tab" data-filter="unwatched">טרם נצפו 🌸</button>
-                <button class="pastel-tab" data-filter="in-progress">באמצע צפייה 🍿</button>
                 <button class="pastel-tab" data-filter="completed">הושלמו 🎉</button>
                 <button class="pastel-tab pill-song-tab" data-filter="songs">שירים ויצירות AI 🎵</button>
             </div>
         </section>
 
-        <!-- באנר המשך צפייה מתוק -->
-        <section id="last-watched-section" class="resume-banner hidden">
-            <div class="resume-card">
-                <div class="resume-art">🎀</div>
-                <div class="resume-details">
-                    <span class="resume-tag">המשך צפייה כיפי 🍿</span>
-                    <h3 id="lw-title">שם הסדרה</h3>
-                    <p id="lw-subtitle">עונה 1 · פרק 1</p>
-                </div>
-                <div class="resume-buttons">
-                    <button class="btn-bubble btn-bubble-primary" id="lw-play-btn">צפי עכשיו ✨</button>
-                    <button class="btn-bubble btn-bubble-soft" id="lw-vlc-btn">נגן במחשב (VLC)</button>
-                </div>
-            </div>
-        </section>
-
-        <!-- גריד הסדרות הראשי -->
+        <!-- גריד הסדרות הראשי (נקי ללא באנרים מיותרים) -->
         <main class="main-content">
-            <div class="content-header">
-                <h2 class="content-title" id="content-heading">כל הסדרות המתוקות שלך</h2>
-                <span class="badge-count" id="visible-series-count">0 סדרות</span>
-            </div>
-
             <div class="cards-grid" id="series-grid">
-                <!-- כרטיסיות סדרה עם פוסטרים אמיתיים -->
+                <!-- כרטיסיות סדרה עם פוסטרים אמיתיים לא חתוכים -->
             </div>
 
             <!-- אזור שירים ויצירות אישיות -->
             <div class="songs-grid hidden" id="songs-grid">
-                <!-- רשימת שירים מופרדת עם שמות מלאים -->
+                <!-- רשימת שירים עם שמות מלאים -->
+            </div>
+
+            <!-- אזור פרקים מועדפים -->
+            <div class="favorites-grid hidden" id="favorites-grid">
+                <!-- רשימת פרקים שסומנו ב-⭐ -->
             </div>
 
             <div class="empty-box hidden" id="empty-state">
                 <div class="empty-emoji">🥺</div>
                 <h3>לא מצאנו תוצאות מתאימות</h3>
-                <p>נסי לחפש משהו אחר או לחצי על 'הכל'</p>
+                <p>נסי לחפש משהו אחר או לחצי על 'כל הסדרות'</p>
             </div>
         </main>
     </div>
 
-    <!-- מודל סדרה ועונות (ללא גלילות כפולות!) -->
-    <div class="modal-overlay hidden" id="series-modal">
-        <div class="modal-card modal-series">
-            <button class="btn-close-modal" id="close-series-modal" title="סגור">✕</button>
+    <!-- תצוגת סדרה מלאה על כל המסך (כמו בנטפליקס!) -->
+    <div class="fullscreen-series-view hidden" id="series-fullscreen-view">
+        <div class="series-view-header">
+            <button class="btn-back-hub" id="btn-back-to-home">
+                <span>➔</span> חזרה לכל הסדרות
+            </button>
+            <div class="series-view-brand">SeriesHub ✨</div>
+        </div>
 
-            <div class="series-popup-header">
-                <div class="popup-poster-wrap">
-                    <img id="modal-poster-img" class="popup-poster" src="" alt="פוסטר סדרה">
+        <div class="series-view-content">
+            <!-- אזור עליון: פוסטר מלא ופרטי סדרה -->
+            <div class="series-hero-card">
+                <div class="hero-poster-box">
+                    <img id="hero-poster-img" class="hero-poster" src="" alt="פוסטר סדרה">
                 </div>
-                <div class="popup-info">
-                    <div class="popup-badges">
-                        <span class="pastel-badge" id="modal-formats-badge">HD</span>
-                        <span class="pastel-badge badge-rose" id="modal-seasons-count">0 עונות</span>
-                        <span class="pastel-badge badge-purple" id="modal-episodes-count">0 פרקים</span>
+                <div class="hero-info">
+                    <h2 class="hero-title" id="hero-series-name">שם הסדרה</h2>
+                    <div class="hero-meta-pills">
+                        <span class="hero-pill" id="hero-seasons-count">0 עונות</span>
+                        <span class="hero-pill" id="hero-episodes-count">0 פרקים</span>
+                        <span class="hero-pill pill-pink" id="hero-watched-progress">0% נצפו</span>
                     </div>
-                    <h2 class="popup-title" id="modal-series-name">שם הסדרה</h2>
-                    <div class="popup-progress-wrap">
-                        <div class="popup-progress-text">
-                            <span id="modal-watched-progress">0% נצפו</span>
-                            <span>💖</span>
-                        </div>
-                        <div class="candy-track">
-                            <div class="candy-bar" id="modal-progress-bar" style="width: 0%;"></div>
-                        </div>
+
+                    <div class="hero-progress-track">
+                        <div class="hero-progress-bar" id="hero-progress-bar" style="width: 0%;"></div>
                     </div>
                 </div>
             </div>
 
-            <!-- טאבים של עונות -->
-            <div class="season-pill-list" id="seasons-tabs">
-                <!-- טאבי עונות פסטליים -->
+            <!-- בחירת עונה -->
+            <div class="season-selector-wrap">
+                <h3 class="season-section-title">בחרי עונה:</h3>
+                <div class="seasons-pill-bar" id="seasons-tabs">
+                    <!-- טאבים של עונות -->
+                </div>
             </div>
 
-            <!-- רשימת פרקים -->
-            <div class="season-episodes-box">
-                <div class="episodes-subhead">
+            <!-- רשימת פרקים נקייה (רק מספר פרק וכפתורים נוחים) -->
+            <div class="episodes-section">
+                <div class="episodes-header-clean">
                     <h3 id="current-season-title">עונה 1</h3>
                     <span id="current-season-count">0 פרקים</span>
                 </div>
-                <div class="episodes-scroll-list" id="episodes-list">
-                    <!-- שורות פרקים -->
+                <div class="episodes-clean-grid" id="episodes-list">
+                    <!-- כרטיסיות פרקים נקיות -->
                 </div>
             </div>
         </div>
@@ -155,7 +125,7 @@
             <div class="player-top">
                 <div class="player-titles">
                     <span class="player-label">צופה כעת בכיף:</span>
-                    <h3 id="player-title">שם הסדרה - עונה 1 פרק 1</h3>
+                    <h3 id="player-title">שם הסדרה - פרק 1</h3>
                 </div>
                 <div class="player-actions">
                     <button class="btn-bubble btn-bubble-soft" id="player-open-vlc-btn">
@@ -170,7 +140,24 @@
             </div>
 
             <div class="player-tip">
-                <span>✨ הווידאו מוזרם מהמחשב באיכות 100% מקורית. לקבצי AVI/MKV ישירות בנגן המחשב לחצי על 'פתח ב-VLC'!</span>
+                <span>✨ הווידאו מוזרם מהמחשב באיכות 100% מקורית ללא שום כיווץ!</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- פופ-אפ אישור סימון כנצפה ביציאה או בסיום פרק -->
+    <div class="modal-overlay hidden" id="watched-prompt-modal">
+        <div class="modal-card prompt-card">
+            <div class="prompt-emoji">🎉</div>
+            <h3 class="prompt-title">נהנית מהפרק?</h3>
+            <p class="prompt-subtitle">האם תרצי לסמן את הפרק כנצפה בספרייה שלך?</p>
+            <div class="prompt-actions">
+                <button class="btn-bubble btn-bubble-primary" id="btn-prompt-yes">
+                    כן, סמן כנצפה 💖
+                </button>
+                <button class="btn-bubble btn-bubble-soft" id="btn-prompt-no">
+                    לא עכשיו 🌸
+                </button>
             </div>
         </div>
     </div>

@@ -2,6 +2,7 @@
 const state = {
     allSeries: [],
     allSongs: [],
+    favoriteEpisodes: [],
     filteredSeries: [],
     filteredSongs: [],
     activeFilter: 'all',
@@ -9,41 +10,32 @@ const state = {
     currentSeries: null,
     currentSeason: null,
     activeEpisodeForVLC: null,
+    
+    // מעקב צפייה לשאלת סימון נצפה ביציאה
+    currentPlayingEpisode: null,
+    playbackPlayDuration: 0,
+    playbackTimer: null,
 };
 
 // אלמנטים מה-DOM
 const elements = {
     seriesGrid: document.getElementById('series-grid'),
     songsGrid: document.getElementById('songs-grid'),
+    favoritesGrid: document.getElementById('favorites-grid'),
     emptyState: document.getElementById('empty-state'),
-    contentHeading: document.getElementById('content-heading'),
     searchInput: document.getElementById('search-input'),
     clearSearch: document.getElementById('clear-search'),
     filterTabs: document.querySelectorAll('.pastel-tab'),
-    visibleSeriesCount: document.getElementById('visible-series-count'),
 
-    // סטטיסטיקות סוכרייה
-    statSeries: document.getElementById('stat-series'),
-    statEpisodes: document.getElementById('stat-episodes'),
-    statWatched: document.getElementById('stat-watched'),
-
-    // באנר המשך צפייה
-    lastWatchedSection: document.getElementById('last-watched-section'),
-    lwTitle: document.getElementById('lw-title'),
-    lwSubtitle: document.getElementById('lw-subtitle'),
-    lwPlayBtn: document.getElementById('lw-play-btn'),
-    lwVlcBtn: document.getElementById('lw-vlc-btn'),
-
-    // מודל סדרה
-    seriesModal: document.getElementById('series-modal'),
-    closeSeriesModal: document.getElementById('close-series-modal'),
-    modalPosterImg: document.getElementById('modal-poster-img'),
-    modalSeriesName: document.getElementById('modal-series-name'),
-    modalFormatsBadge: document.getElementById('modal-formats-badge'),
-    modalSeasonsCount: document.getElementById('modal-seasons-count'),
-    modalEpisodesCount: document.getElementById('modal-episodes-count'),
-    modalWatchedProgress: document.getElementById('modal-watched-progress'),
-    modalProgressBar: document.getElementById('modal-progress-bar'),
+    // תצוגת סדרה מלאה על כל המסך (Fullscreen)
+    seriesFullscreenView: document.getElementById('series-fullscreen-view'),
+    btnBackToHome: document.getElementById('btn-back-to-home'),
+    heroPosterImg: document.getElementById('hero-poster-img'),
+    heroSeriesName: document.getElementById('hero-series-name'),
+    heroSeasonsCount: document.getElementById('hero-seasons-count'),
+    heroEpisodesCount: document.getElementById('hero-episodes-count'),
+    heroWatchedProgress: document.getElementById('hero-watched-progress'),
+    heroProgressBar: document.getElementById('hero-progress-bar'),
     seasonsTabs: document.getElementById('seasons-tabs'),
     currentSeasonTitle: document.getElementById('current-season-title'),
     currentSeasonCount: document.getElementById('current-season-count'),
@@ -55,6 +47,11 @@ const elements = {
     playerTitle: document.getElementById('player-title'),
     html5Player: document.getElementById('html5-player'),
     playerOpenVlcBtn: document.getElementById('player-open-vlc-btn'),
+
+    // מודל שאלת סימון נצפה
+    watchedPromptModal: document.getElementById('watched-prompt-modal'),
+    btnPromptYes: document.getElementById('btn-prompt-yes'),
+    btnPromptNo: document.getElementById('btn-prompt-no'),
 
     // התראות
     toastContainer: document.getElementById('toast-container'),
@@ -91,21 +88,59 @@ function initEventListeners() {
         });
     });
 
-    // סגירת מודלים
-    elements.closeSeriesModal.addEventListener('click', () => elements.seriesModal.classList.add('hidden'));
-    elements.closePlayerModal.addEventListener('click', closePlayer);
+    // כפתור חזרה מהסדרה לכל הסדרות
+    elements.btnBackToHome.addEventListener('click', () => {
+        elements.seriesFullscreenView.classList.add('hidden');
+        document.body.style.overflow = '';
+    });
+
+    // סגירת נגן
+    elements.closePlayerModal.addEventListener('click', tryClosePlayerWithPrompt);
 
     window.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
-            elements.seriesModal.classList.add('hidden');
-            closePlayer();
+            if (!elements.watchedPromptModal.classList.contains('hidden')) {
+                elements.watchedPromptModal.classList.add('hidden');
+                return;
+            }
+            if (!elements.playerModal.classList.contains('hidden')) {
+                tryClosePlayerWithPrompt();
+                return;
+            }
+            if (!elements.seriesFullscreenView.classList.contains('hidden')) {
+                elements.seriesFullscreenView.classList.add('hidden');
+                document.body.style.overflow = '';
+            }
         }
     });
 
-    // כפתור VLC מתוך הנגן המובנה
+    // שאלת סימון נצפה
+    elements.btnPromptYes.addEventListener('click', async () => {
+        if (state.currentPlayingEpisode) {
+            await setEpisodeWatchedExplicit(state.currentPlayingEpisode.id, true);
+            showCuteToast('הפרק סומן כנצפה בהצלחה! 💖', 'success');
+        }
+        elements.watchedPromptModal.classList.add('hidden');
+        closePlayer();
+        fetchLibraryData();
+    });
+
+    elements.btnPromptNo.addEventListener('click', () => {
+        elements.watchedPromptModal.classList.add('hidden');
+        closePlayer();
+    });
+
+    // כפתור VLC מתוך הנגן
     elements.playerOpenVlcBtn.addEventListener('click', () => {
         if (state.activeEpisodeForVLC) {
             openExternalPlayer(state.activeEpisodeForVLC.id, state.activeEpisodeForVLC.path);
+        }
+    });
+
+    // מעקב סיום וידאו
+    elements.html5Player.addEventListener('ended', () => {
+        if (state.currentPlayingEpisode && !state.currentPlayingEpisode.watched) {
+            elements.watchedPromptModal.classList.remove('hidden');
         }
     });
 }
@@ -113,63 +148,31 @@ function initEventListeners() {
 // קבלת נתונים מהשרת
 async function fetchLibraryData() {
     try {
-        const [seriesRes, statsRes] = await Promise.all([
-            fetch('/api/series'),
-            fetch('/api/stats')
-        ]);
+        const res = await fetch('/api/series');
+        const data = await res.json();
 
-        const seriesData = await seriesRes.json();
-        const statsData = await statsRes.json();
+        state.allSeries = (data.series || []).filter(s => s.name !== 'פרקים בודדים');
+        state.allSongs = data.songs || [];
+        state.favoriteEpisodes = data.favorites || [];
 
-        // סינון סדרות: מוציאים פרקים בודדים מהרשימה הראשית של הסדרות
-        state.allSeries = (seriesData.series || []).filter(s => s.name !== 'פרקים בודדים');
-        state.allSongs = seriesData.songs || [];
-
-        updateStats(statsData);
         applyFilters();
-        updateLastWatchedBanner(statsData.last_watched);
+
+        // אם תצוגת סדרה פתוחה, רענן את נתוניה
+        if (state.currentSeries && !elements.seriesFullscreenView.classList.contains('hidden')) {
+            openSeriesFullscreen(state.currentSeries.name, state.currentSeason);
+        }
     } catch (err) {
         console.error('Error fetching data:', err);
         showCuteToast('שגיאה בהתחברות לשרת 🌸', 'error');
     }
 }
 
-// עדכון סטטיסטיקות
-function updateStats(stats) {
-    elements.statSeries.textContent = state.allSeries.length;
-    
-    let totalEps = 0;
-    state.allSeries.forEach(s => totalEps += s.total_episodes);
-    elements.statEpisodes.textContent = totalEps;
-    
-    elements.statWatched.textContent = stats.total_watched || 0;
-}
-
-// עדכון באנר המשך צפייה
-function updateLastWatchedBanner(lastWatched) {
-    if (!lastWatched || !lastWatched.series) {
-        elements.lastWatchedSection.classList.add('hidden');
-        return;
-    }
-
-    elements.lwTitle.textContent = lastWatched.series;
-    elements.lwSubtitle.textContent = `עונה ${lastWatched.season} · פרק ${lastWatched.episode}`;
-    elements.lastWatchedSection.classList.remove('hidden');
-
-    elements.lwPlayBtn.onclick = () => {
-        openSeriesModal(lastWatched.series, lastWatched.season);
-    };
-
-    elements.lwVlcBtn.onclick = () => {
-        openExternalPlayer(lastWatched.id);
-    };
-}
-
 // החלת סינונים
 function applyFilters() {
+    // 1. טאב שירים
     if (state.activeFilter === 'songs') {
-        elements.contentHeading.textContent = 'שירים ויצירות אישיות 🎵';
         elements.seriesGrid.classList.add('hidden');
+        elements.favoritesGrid.classList.add('hidden');
         elements.songsGrid.classList.remove('hidden');
 
         let songs = [...state.allSongs];
@@ -181,10 +184,24 @@ function applyFilters() {
         return;
     }
 
-    // תצוגת סדרות רגילה
+    // 2. טאב מועדפים
+    if (state.activeFilter === 'favorites') {
+        elements.seriesGrid.classList.add('hidden');
+        elements.songsGrid.classList.add('hidden');
+        elements.favoritesGrid.classList.remove('hidden');
+
+        let favs = [...state.favoriteEpisodes];
+        if (state.searchQuery) {
+            favs = favs.filter(e => (e.series || '').toLowerCase().includes(state.searchQuery));
+        }
+        renderFavoritesGrid(favs);
+        return;
+    }
+
+    // 3. תצוגת סדרות רגילה
     elements.songsGrid.classList.add('hidden');
+    elements.favoritesGrid.classList.add('hidden');
     elements.seriesGrid.classList.remove('hidden');
-    elements.contentHeading.textContent = 'כל הסדרות המתוקות שלך 🍿';
 
     let result = [...state.allSeries];
 
@@ -194,8 +211,6 @@ function applyFilters() {
 
     if (state.activeFilter === 'unwatched') {
         result = result.filter(s => s.watched_episodes === 0);
-    } else if (state.activeFilter === 'in-progress') {
-        result = result.filter(s => s.watched_episodes > 0 && s.watched_episodes < s.total_episodes);
     } else if (state.activeFilter === 'completed') {
         result = result.filter(s => s.watched_episodes === s.total_episodes && s.total_episodes > 0);
     }
@@ -204,10 +219,9 @@ function applyFilters() {
     renderSeriesGrid();
 }
 
-// רינדור גריד הסדרות עם פוסטרים אמיתיים
+// רינדור גריד סדרות
 function renderSeriesGrid() {
     elements.seriesGrid.innerHTML = '';
-    elements.visibleSeriesCount.textContent = `${state.filteredSeries.length} סדרות`;
 
     if (state.filteredSeries.length === 0) {
         elements.emptyState.classList.remove('hidden');
@@ -222,7 +236,7 @@ function renderSeriesGrid() {
     });
 }
 
-// יצירת כרטיסיית סדרה פסטלית
+// כרטיסיית סדרה – פוסטר שלם ולא חתוך!
 function createCuteCard(series) {
     const card = document.createElement('div');
     card.className = 'cute-card';
@@ -231,10 +245,8 @@ function createCuteCard(series) {
         ? Math.round((series.watched_episodes / series.total_episodes) * 100) 
         : 0;
 
-    const formatsStr = series.formats.join(', ');
     const isCompleted = progressPercent === 100 && series.total_episodes > 0;
 
-    // פוסטר אמיתי מהאינטרנט שנשמר מקומית
     let posterHtml = '';
     if (series.poster) {
         posterHtml = `
@@ -247,7 +259,6 @@ function createCuteCard(series) {
     card.innerHTML = `
         <div class="poster-box">
             ${posterHtml}
-            <div class="format-candy-pill">${formatsStr}</div>
         </div>
         <div class="card-text">
             <h3 class="card-series-name" title="${escapeHtml(series.name)}">${escapeHtml(series.name)}</h3>
@@ -268,32 +279,245 @@ function createCuteCard(series) {
         </div>
     `;
 
-    card.addEventListener('click', () => openSeriesModal(series.name));
+    card.addEventListener('click', () => openSeriesFullscreen(series.name));
     return card;
 }
 
-// רינדור שירים ויצירות AI
+// פתיחת מסך סדרה מלא (Full Screen Netflix-Style)
+async function openSeriesFullscreen(seriesName, targetSeason = null) {
+    try {
+        const res = await fetch(`/api/series/${encodeURIComponent(seriesName)}`);
+        if (!res.ok) throw new Error('Failed to load series');
+        const data = await res.json();
+
+        state.currentSeries = data;
+        elements.heroSeriesName.textContent = data.name;
+        elements.heroEpisodesCount.textContent = `${data.total_episodes} פרקים`;
+
+        if (data.poster) {
+            elements.heroPosterImg.src = data.poster;
+            elements.heroPosterImg.classList.remove('hidden');
+        } else {
+            elements.heroPosterImg.classList.add('hidden');
+        }
+
+        const seasonKeys = Object.keys(data.seasons).sort((a, b) => Number(a) - Number(b));
+        elements.heroSeasonsCount.textContent = `${seasonKeys.length} עונות`;
+
+        let totalWatched = 0;
+        seasonKeys.forEach(sNum => {
+            totalWatched += data.seasons[sNum].filter(e => e.watched).length;
+        });
+        const percent = data.total_episodes > 0 ? Math.round((totalWatched / data.total_episodes) * 100) : 0;
+        elements.heroWatchedProgress.textContent = `${percent}% נצפו`;
+        elements.heroProgressBar.style.width = `${percent}%`;
+
+        // רינדור טאבים של עונות
+        elements.seasonsTabs.innerHTML = '';
+        seasonKeys.forEach((sNum, index) => {
+            const btn = document.createElement('button');
+            btn.className = `season-btn-pill ${((targetSeason && Number(sNum) === Number(targetSeason)) || (!targetSeason && index === 0)) ? 'active' : ''}`;
+            btn.textContent = `עונה ${sNum} (${data.seasons[sNum].length})`;
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.season-btn-pill').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                renderCleanEpisodes(sNum);
+            });
+            elements.seasonsTabs.appendChild(btn);
+        });
+
+        const initialSeason = targetSeason && seasonKeys.includes(String(targetSeason)) ? String(targetSeason) : seasonKeys[0];
+        renderCleanEpisodes(initialSeason);
+
+        elements.seriesFullscreenView.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    } catch (err) {
+        console.error(err);
+        showCuteToast('שגיאה בטעינת הסדרה 🌸', 'error');
+    }
+}
+
+// רינדור פרקים נקי לחלוטין (כמו נטפליקס - ללא כיתובים טכניים!)
+function renderCleanEpisodes(seasonNum) {
+    state.currentSeason = seasonNum;
+    const episodes = state.currentSeries.seasons[seasonNum] || [];
+
+    elements.currentSeasonTitle.textContent = `עונה ${seasonNum}`;
+    elements.currentSeasonCount.textContent = `${episodes.length} פרקים`;
+    elements.episodesList.innerHTML = '';
+
+    episodes.forEach(ep => {
+        const card = document.createElement('div');
+        card.className = `clean-episode-card ${ep.watched ? 'watched' : ''}`;
+
+        card.innerHTML = `
+            <div class="ep-card-top">
+                <div class="ep-title-clean">פרק ${ep.episode}</div>
+                <div class="ep-card-icons">
+                    <button class="icon-btn fav-btn ${ep.favorite ? 'active' : ''}" title="${ep.favorite ? 'הסר ממועדפים' : 'שמור במועדפים שאהבתי'}">
+                        ⭐
+                    </button>
+                    <button class="icon-btn watch-btn ${ep.watched ? 'active' : ''}" title="${ep.watched ? 'סמן כלא נצפה' : 'סמן כנצפה'}">
+                        ${ep.watched ? '💖' : '🤍'}
+                    </button>
+                </div>
+            </div>
+            <div class="ep-card-buttons">
+                ${ep.is_playable_in_browser ? `
+                    <button class="btn-bubble btn-bubble-primary btn-play-browser">צפי עכשיו ✨</button>
+                ` : ''}
+                <button class="btn-bubble btn-bubble-soft btn-play-vlc">נגן במחשב (VLC)</button>
+            </div>
+        `;
+
+        // ניגון בדפדפן
+        const playBtn = card.querySelector('.btn-play-browser');
+        if (playBtn) {
+            playBtn.onclick = () => openInBrowserPlayer(ep);
+        }
+
+        // נגן מקומי
+        const vlcBtn = card.querySelector('.btn-play-vlc');
+        if (vlcBtn) {
+            vlcBtn.onclick = () => openExternalPlayer(ep.id, ep.path);
+        }
+
+        // כפתור מועדפים ⭐
+        const favBtn = card.querySelector('.fav-btn');
+        favBtn.onclick = async () => {
+            const isFav = await toggleFavoriteStatus(ep.id);
+            ep.favorite = isFav;
+            favBtn.classList.toggle('active', isFav);
+            showCuteToast(isFav ? 'נוסף למועדפים שאהבת! ⭐' : 'הוסר מהמועדפים 🌸', 'info');
+            fetchLibraryData();
+        };
+
+        // כפתור נצפה 💖
+        const watchBtn = card.querySelector('.watch-btn');
+        watchBtn.onclick = async () => {
+            const isWatched = await toggleWatchedStatus(ep.id);
+            ep.watched = isWatched;
+            card.classList.toggle('watched', isWatched);
+            watchBtn.classList.toggle('active', isWatched);
+            watchBtn.textContent = isWatched ? '💖' : '🤍';
+            showCuteToast(isWatched ? 'סומן כנצפה! 💖' : 'הוסר מנצפה 🌸', 'info');
+            fetchLibraryData();
+        };
+
+        elements.episodesList.appendChild(card);
+    });
+}
+
+// נגן וידאו מובנה ומהיר באיכות מקורית מלאה
+function openInBrowserPlayer(ep) {
+    state.activeEpisodeForVLC = ep;
+    state.currentPlayingEpisode = ep;
+    state.playbackPlayDuration = 0;
+
+    clearInterval(state.playbackTimer);
+    state.playbackTimer = setInterval(() => {
+        if (!elements.html5Player.paused) {
+            state.playbackPlayDuration += 1;
+        }
+    }, 1000);
+
+    elements.playerTitle.textContent = `${ep.series} - פרק ${ep.episode}`;
+    elements.html5Player.src = `/api/stream/${ep.id}`;
+    elements.playerModal.classList.remove('hidden');
+    elements.html5Player.play().catch(e => console.log('Autoplay:', e));
+}
+
+// סגירת נגן עם שאלה אם לסמן כנצפה
+function tryClosePlayerWithPrompt() {
+    elements.html5Player.pause();
+    clearInterval(state.playbackTimer);
+
+    const ep = state.currentPlayingEpisode;
+    if (ep && !ep.watched) {
+        const duration = elements.html5Player.duration || 0;
+        const currentTime = elements.html5Player.currentTime || 0;
+        const ratio = duration > 0 ? (currentTime / duration) : 0;
+
+        // אם צפה בלמעלה מ-35% מהפרק או שהיה יותר מ-45 שניות בצפייה
+        if (ratio >= 0.35 || state.playbackPlayDuration >= 45) {
+            elements.watchedPromptModal.classList.remove('hidden');
+            return;
+        }
+    }
+
+    closePlayer();
+}
+
+function closePlayer() {
+    elements.html5Player.pause();
+    elements.html5Player.src = '';
+    elements.playerModal.classList.add('hidden');
+    clearInterval(state.playbackTimer);
+    state.currentPlayingEpisode = null;
+}
+
+// רינדור פרקים מועדפים
+function renderFavoritesGrid(favs) {
+    elements.favoritesGrid.innerHTML = '';
+    if (favs.length === 0) {
+        elements.emptyState.classList.remove('hidden');
+        return;
+    }
+    elements.emptyState.classList.add('hidden');
+
+    favs.forEach(ep => {
+        const card = document.createElement('div');
+        card.className = 'clean-episode-card';
+        card.innerHTML = `
+            <div class="ep-card-top">
+                <div>
+                    <h3 style="font-size: 18px; font-weight: 900;">${escapeHtml(ep.series)}</h3>
+                    <div style="font-size: 14px; color: var(--pastel-rose); font-weight: 800;">עונה ${ep.season} · פרק ${ep.episode}</div>
+                </div>
+                <button class="icon-btn fav-btn active" title="הסר ממועדפים">⭐</button>
+            </div>
+            <div class="ep-card-buttons">
+                ${ep.is_playable_in_browser ? `
+                    <button class="btn-bubble btn-bubble-primary btn-fav-play">צפי עכשיו ✨</button>
+                ` : ''}
+                <button class="btn-bubble btn-bubble-soft btn-fav-vlc">נגן במחשב (VLC)</button>
+            </div>
+        `;
+
+        const playBtn = card.querySelector('.btn-fav-play');
+        if (playBtn) playBtn.onclick = () => openInBrowserPlayer(ep);
+
+        const vlcBtn = card.querySelector('.btn-fav-vlc');
+        if (vlcBtn) vlcBtn.onclick = () => openExternalPlayer(ep.id, ep.path);
+
+        const starBtn = card.querySelector('.fav-btn');
+        starBtn.onclick = async () => {
+            await toggleFavoriteStatus(ep.id);
+            showCuteToast('הוסר מהמועדפים 🌸', 'info');
+            fetchLibraryData();
+        };
+
+        elements.favoritesGrid.appendChild(card);
+    });
+}
+
+// רינדור שירים
 function renderSongsGrid() {
     elements.songsGrid.innerHTML = '';
-    elements.visibleSeriesCount.textContent = `${state.filteredSongs.length} יצירות`;
-
     if (state.filteredSongs.length === 0) {
         elements.emptyState.classList.remove('hidden');
         return;
     }
-
     elements.emptyState.classList.add('hidden');
 
     state.filteredSongs.forEach(song => {
         const card = document.createElement('div');
         card.className = 'song-card';
-
         card.innerHTML = `
             <div class="song-info">
                 <div class="song-avatar">🎵</div>
                 <div class="song-details">
                     <h4>${escapeHtml(song.title)}</h4>
-                    <span>${song.format} · ${song.size_mb} MB</span>
                 </div>
             </div>
             <div style="display: flex; gap: 8px;">
@@ -309,7 +533,7 @@ function renderSongsGrid() {
             playBtn.onclick = () => {
                 openInBrowserPlayer({
                     id: song.id,
-                    series: 'שיר / יצירה אישית',
+                    series: 'שיר אישי',
                     season: 1,
                     episode: song.title
                 });
@@ -325,152 +549,10 @@ function renderSongsGrid() {
     });
 }
 
-// פתיחת מודל סדרה
-async function openSeriesModal(seriesName, targetSeason = null) {
-    try {
-        const res = await fetch(`/api/series/${encodeURIComponent(seriesName)}`);
-        if (!res.ok) throw new Error('Failed to load series');
-        const data = await res.json();
-
-        state.currentSeries = data;
-        elements.modalSeriesName.textContent = data.name;
-        elements.modalFormatsBadge.textContent = 'סדרת טלוויזיה ✨';
-        elements.modalEpisodesCount.textContent = `${data.total_episodes} פרקים`;
-
-        if (data.poster) {
-            elements.modalPosterImg.src = data.poster;
-            elements.modalPosterImg.classList.remove('hidden');
-        } else {
-            elements.modalPosterImg.classList.add('hidden');
-        }
-
-        const seasonKeys = Object.keys(data.seasons).sort((a, b) => Number(a) - Number(b));
-        elements.modalSeasonsCount.textContent = `${seasonKeys.length} עונות`;
-
-        let totalWatched = 0;
-        seasonKeys.forEach(sNum => {
-            totalWatched += data.seasons[sNum].filter(e => e.watched).length;
-        });
-        const percent = data.total_episodes > 0 ? Math.round((totalWatched / data.total_episodes) * 100) : 0;
-        elements.modalWatchedProgress.textContent = `${percent}% נצפו`;
-        elements.modalProgressBar.style.width = `${percent}%`;
-
-        // רינדור טאבים של עונות
-        elements.seasonsTabs.innerHTML = '';
-        seasonKeys.forEach((sNum, index) => {
-            const btn = document.createElement('button');
-            btn.className = `season-btn-pill ${((targetSeason && Number(sNum) === Number(targetSeason)) || (!targetSeason && index === 0)) ? 'active' : ''}`;
-            btn.textContent = `עונה ${sNum} (${data.seasons[sNum].length})`;
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.season-btn-pill').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                renderSeasonEpisodes(sNum);
-            });
-            elements.seasonsTabs.appendChild(btn);
-        });
-
-        const initialSeason = targetSeason && seasonKeys.includes(String(targetSeason)) ? String(targetSeason) : seasonKeys[0];
-        renderSeasonEpisodes(initialSeason);
-
-        elements.seriesModal.classList.remove('hidden');
-    } catch (err) {
-        console.error(err);
-        showCuteToast('שגיאה בטעינת הסדרה 🌸', 'error');
-    }
-}
-
-// רינדור פרקים (בדיוק ללא גלילה כפולה!)
-function renderSeasonEpisodes(seasonNum) {
-    state.currentSeason = seasonNum;
-    const episodes = state.currentSeries.seasons[seasonNum] || [];
-
-    elements.currentSeasonTitle.textContent = `עונה ${seasonNum}`;
-    elements.currentSeasonCount.textContent = `${episodes.length} פרקים 🍿`;
-    elements.episodesList.innerHTML = '';
-
-    episodes.forEach(ep => {
-        const row = document.createElement('div');
-        row.className = `episode-item ${ep.watched ? 'watched' : ''}`;
-
-        row.innerHTML = `
-            <div class="ep-left">
-                <div class="ep-bubble-num">${ep.episode}</div>
-                <div class="ep-text">
-                    <h4>פרק ${ep.episode}</h4>
-                    <div class="ep-text-meta">
-                        <span class="ep-format-tag">${ep.format}</span>
-                        <span>${ep.size_mb} MB</span>
-                    </div>
-                </div>
-            </div>
-            <div class="ep-actions">
-                ${ep.is_playable_in_browser ? `
-                    <button class="btn-bubble btn-bubble-primary btn-ep-play">צפי עכשיו ✨</button>
-                ` : ''}
-                <button class="btn-bubble btn-bubble-soft btn-ep-vlc">נגן במחשב (VLC)</button>
-                <button class="btn-fav-watch ${ep.watched ? 'watched' : ''}" title="${ep.watched ? 'סמן כלא נצפה' : 'סמן כנצפה'}">
-                    ${ep.watched ? '💖' : '🤍'}
-                </button>
-            </div>
-        `;
-
-        // כפתור ניגון בדפדפן
-        const playBtn = row.querySelector('.btn-ep-play');
-        if (playBtn) {
-            playBtn.onclick = () => openInBrowserPlayer(ep);
-        }
-
-        // כפתור נגן מקומי
-        const vlcBtn = row.querySelector('.btn-ep-vlc');
-        if (vlcBtn) {
-            vlcBtn.onclick = () => openExternalPlayer(ep.id, ep.path);
-        }
-
-        // סימון נצפה
-        const heartBtn = row.querySelector('.btn-fav-watch');
-        heartBtn.onclick = async () => {
-            const isWatched = await toggleEpisodeWatched(ep.id);
-            ep.watched = isWatched;
-            row.classList.toggle('watched', isWatched);
-            heartBtn.classList.toggle('watched', isWatched);
-            heartBtn.textContent = isWatched ? '💖' : '🤍';
-            showCuteToast(isWatched ? 'סומן כנצפה! 💖' : 'הוסר מנצפה 🌸', 'info');
-            fetchLibraryData();
-        };
-
-        elements.episodesList.appendChild(row);
-    });
-}
-
-// נגן וידאו מובנה ומהיר באיכות מקסימלית
-function openInBrowserPlayer(ep) {
-    state.activeEpisodeForVLC = ep;
-    elements.playerTitle.textContent = `${ep.series} - עונה ${ep.season} פרק ${ep.episode}`;
-    elements.html5Player.src = `/api/stream/${ep.id}`;
-    elements.playerModal.classList.remove('hidden');
-    elements.html5Player.play().catch(e => console.log('Autoplay prevented:', e));
-
-    elements.html5Player.ontimeupdate = () => {
-        if (elements.html5Player.duration > 0) {
-            const ratio = elements.html5Player.currentTime / elements.html5Player.duration;
-            if (ratio >= 0.8 && !ep.watched) {
-                ep.watched = true;
-                toggleEpisodeWatched(ep.id);
-            }
-        }
-    };
-}
-
-function closePlayer() {
-    elements.html5Player.pause();
-    elements.html5Player.src = '';
-    elements.playerModal.classList.add('hidden');
-}
-
-// פתיחה בנגן שולחני
+// API קריאות
 async function openExternalPlayer(id, path = null) {
     try {
-        showCuteToast('פותח בנגן המדיה המקומי... 🎬', 'info');
+        showCuteToast('פותח בנגן המדיה במחשב... 🎬', 'info');
         const res = await fetch('/api/open-external', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -478,18 +560,16 @@ async function openExternalPlayer(id, path = null) {
         });
         const data = await res.json();
         if (res.ok) {
-            showCuteToast('הפרק נפתח במחשב בהצלחה! 🍿', 'success');
+            showCuteToast('הפרק נפתח בהצלחה! 🍿', 'success');
         } else {
             showCuteToast(data.detail || 'שגיאה בפתיחת הנגן', 'error');
         }
     } catch (err) {
-        console.error(err);
         showCuteToast('שגיאה בהתחברות לשרת', 'error');
     }
 }
 
-// סימון נצפה
-async function toggleEpisodeWatched(id) {
+async function toggleWatchedStatus(id) {
     try {
         const res = await fetch('/api/watched', {
             method: 'POST',
@@ -499,12 +579,34 @@ async function toggleEpisodeWatched(id) {
         const data = await res.json();
         return data.watched;
     } catch (err) {
-        console.error(err);
         return false;
     }
 }
 
-// התראות סוכרייה מתוקות
+async function setEpisodeWatchedExplicit(id, val) {
+    try {
+        await fetch('/api/watched', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, watched: val })
+        });
+    } catch (err) {}
+}
+
+async function toggleFavoriteStatus(id) {
+    try {
+        const res = await fetch('/api/favorite', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id })
+        });
+        const data = await res.json();
+        return data.favorite;
+    } catch (err) {
+        return false;
+    }
+}
+
 function showCuteToast(message, type = 'info') {
     const toast = document.createElement('div');
     toast.className = `candy-toast toast-${type}`;

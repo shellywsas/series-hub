@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
 from pydantic import BaseModel
 
 from scanner import scan_directory, clean_series_name
-from database import load_watched_data, toggle_watched, set_last_watched
+from database import load_watched_data, toggle_watched, toggle_favorite, set_last_watched
 
 DOWNLOADS_DIR = r"C:\Users\shell\Downloads"
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
@@ -31,21 +31,6 @@ CACHE = {
     "data": None,
     "file_map": {}
 }
-
-# פלטת צבעי פסטל חמודים ונעימים
-PASTEL_PALETTES = [
-    {"bg": "#fce7f3", "border": "#f472b6", "badge": "#ec4899", "accent": "#fbcfe8"},  # Pastel Pink
-    {"bg": "#ede9fe", "border": "#a78bfa", "badge": "#8b5cf6", "accent": "#ddd6fe"},  # Lavender
-    {"bg": "#e0f2fe", "border": "#38bdf8", "badge": "#0284c7", "accent": "#bae6fd"},  # Baby Blue
-    {"bg": "#dcfce7", "border": "#4ade80", "badge": "#16a34a", "accent": "#bbf7d0"},  # Soft Mint
-    {"bg": "#fef3c7", "border": "#fbbf24", "badge": "#d97706", "accent": "#fde68a"},  # Warm Peach
-    {"bg": "#ffe4e6", "border": "#fb7185", "badge": "#e11d48", "accent": "#fecdd3"},  # Rosewater
-    {"bg": "#ccfbf1", "border": "#2dd4bf", "badge": "#0d9488", "accent": "#99f6e4"},  # Turquoise
-]
-
-def get_pastel_palette(name: str):
-    idx = sum(ord(c) for c in name) % len(PASTEL_PALETTES)
-    return PASTEL_PALETTES[idx]
 
 def get_scanned_data(force: bool = False):
     if CACHE["data"] is None or force:
@@ -66,15 +51,17 @@ def get_stats():
     data = get_scanned_data()
     watched_data = load_watched_data()
     watched_map = watched_data.get("watched_episodes", {})
+    favs_map = watched_data.get("favorites", {})
     
     total_watched = sum(1 for ep_id, w in watched_map.items() if w and ep_id in CACHE["file_map"])
+    total_favorites = sum(1 for ep_id, f in favs_map.items() if f and ep_id in CACHE["file_map"])
     
     return {
         "total_series": data["total_series"],
         "total_episodes": data["total_episodes"],
         "total_watched": total_watched,
-        "total_songs": len(data.get("misc_items", [])),
-        "last_watched": watched_data.get("last_watched")
+        "total_favorites": total_favorites,
+        "total_songs": len(data.get("misc_items", []))
     }
 
 @app.get("/api/series")
@@ -82,6 +69,7 @@ def list_series():
     data = get_scanned_data()
     watched_data = load_watched_data()
     watched_map = watched_data.get("watched_episodes", {})
+    favs_map = watched_data.get("favorites", {})
 
     result = []
     for name, s in sorted(data["series"].items(), key=lambda x: -x[1]["total_episodes"]):
@@ -102,12 +90,21 @@ def list_series():
             "watched_episodes": watched_count,
             "seasons_count": len(s["seasons"]),
             "seasons": seasons_summary,
-            "formats": s["formats"],
-            "palette": get_pastel_palette(name)
+            "formats": s["formats"]
         })
+
+    # מציאת פרקים מועדפים
+    favorite_episodes = []
+    for ep_id, is_fav in favs_map.items():
+        if is_fav and ep_id in CACHE["file_map"]:
+            ep_item = dict(CACHE["file_map"][ep_id])
+            ep_item["watched"] = watched_map.get(ep_id, False)
+            ep_item["favorite"] = True
+            favorite_episodes.append(ep_item)
 
     return {
         "series": result,
+        "favorites": favorite_episodes,
         "songs": data.get("misc_items", [])
     }
 
@@ -120,6 +117,7 @@ def get_series_details(series_name: str):
     s = data["series"][series_name]
     watched_data = load_watched_data()
     watched_map = watched_data.get("watched_episodes", {})
+    favs_map = watched_data.get("favorites", {})
 
     seasons_data = {}
     for s_num, eps in s["seasons"].items():
@@ -127,13 +125,13 @@ def get_series_details(series_name: str):
         for ep in eps:
             ep_dict = dict(ep)
             ep_dict["watched"] = watched_map.get(ep["id"], False)
+            ep_dict["favorite"] = favs_map.get(ep["id"], False)
             ep_list.append(ep_dict)
         seasons_data[s_num] = ep_list
 
     return {
         "name": series_name,
         "poster": s.get("poster"),
-        "palette": get_pastel_palette(series_name),
         "total_episodes": s["total_episodes"],
         "seasons": seasons_data
     }
@@ -163,11 +161,20 @@ def open_in_external_player(req: OpenFileRequest):
 
 class ToggleWatchedRequest(BaseModel):
     id: str
+    watched: Optional[bool] = None
 
 @app.post("/api/watched")
 def toggle_watched_status(req: ToggleWatchedRequest):
-    new_status = toggle_watched(req.id)
+    new_status = toggle_watched(req.id, req.watched)
     return {"id": req.id, "watched": new_status}
+
+class ToggleFavoriteRequest(BaseModel):
+    id: str
+
+@app.post("/api/favorite")
+def toggle_favorite_status(req: ToggleFavoriteRequest):
+    new_fav = toggle_favorite(req.id)
+    return {"id": req.id, "favorite": new_fav}
 
 @app.post("/api/rescan")
 def rescan():
@@ -182,7 +189,6 @@ def rescan():
 def stream_video(episode_id: str, request: Request):
     """
     הזרמת וידאו סופר-מהירה באיכות מקסימלית (100% ללא דחיסה או ירידת איכות).
-    תמיכה מדויקת ב-HTTP 206 Range Requests וטעינה מיידית ללא השהיות.
     """
     get_scanned_data()
     ep = CACHE["file_map"].get(episode_id)
@@ -202,8 +208,6 @@ def stream_video(episode_id: str, request: Request):
         mime_type = "video/mp4"
 
     range_header = request.headers.get("range")
-    
-    # גודל מקטע קריאה מיטבי (256KB) לטעינה מיידית ללא תקיעות
     CHUNK_SIZE = 256 * 1024
 
     if range_header:
@@ -236,7 +240,6 @@ def stream_video(episode_id: str, request: Request):
             }
             return StreamingResponse(range_generator(), status_code=206, headers=headers)
 
-    # אם לא נשלח Range (התחלת קובץ)
     def full_generator():
         with open(file_path, "rb") as f:
             while chunk := f.read(CHUNK_SIZE):
