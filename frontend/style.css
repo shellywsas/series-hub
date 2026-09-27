@@ -891,111 +891,11 @@ body {
     display: block;
 }
 
-/* התאמה למסך מלא (Fullscreen) – כל הכפתורים ממשיכים לפעול ולהיות חלק מהווידאו */
-.video-container:fullscreen,
-.video-container:-webkit-full-screen {
-    width: 100vw !important;
-    height: 100vh !important;
-    max-height: 100vh !important;
-    border-radius: 0 !important;
-    background: #000000 !important;
-}
-
-.video-container:fullscreen video,
-.video-container:-webkit-full-screen video {
-    width: 100vw !important;
-    height: 100vh !important;
-    max-height: 100vh !important;
-    object-fit: contain !important;
-}
-
-/* כפתורי דילוג צפים ישירות על גבי הווידאו (זמינים גם במסך מלא!) */
-.on-video-controls {
-    position: absolute;
-    top: 50%;
-    left: 0;
-    right: 0;
-    transform: translateY(-50%);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 32px;
-    pointer-events: none;
-    z-index: 100;
-    opacity: 0;
-    transition: opacity 0.28s ease;
-}
-
-.video-container:hover .on-video-controls,
-.on-video-controls.visible {
-    opacity: 1;
-}
-
-.video-container:fullscreen .on-video-controls,
-.video-container:-webkit-full-screen .on-video-controls {
-    z-index: 2147483647 !important;
-    padding: 0 50px !important;
-}
-
-.video-container:fullscreen .skip-feedback,
-.video-container:-webkit-full-screen .skip-feedback {
-    z-index: 2147483647 !important;
-}
-
-.video-container:fullscreen .next-ep-overlay,
-.video-container:-webkit-full-screen .next-ep-overlay {
-    z-index: 2147483647 !important;
-    bottom: 36px !important;
-    left: 36px !important;
-}
-
-.btn-video-skip {
-    pointer-events: auto;
-    background: rgba(46, 38, 56, 0.65);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 2px solid rgba(251, 207, 232, 0.5);
-    color: #ffffff;
-    font-family: inherit;
-    font-size: 15px;
-    font-weight: 800;
-    padding: 12px 20px;
-    border-radius: var(--radius-pill);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-    transition: var(--bounce-transition);
-}
-
-.btn-video-skip:hover {
-    background: var(--pastel-rose);
-    border-color: var(--pastel-rose);
-    transform: scale(1.1);
-    box-shadow: 0 10px 30px rgba(244, 114, 182, 0.5);
-}
-
-.btn-video-skip span {
-    font-size: 18px;
-}
-
-.skip-feedback {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(46, 38, 56, 0.85);
-    backdrop-filter: blur(10px);
-    border: 2px solid var(--pastel-pink);
-    color: #ffffff;
-    font-size: 24px;
-    font-weight: 900;
-    padding: 14px 28px;
-    border-radius: var(--radius-pill);
-    pointer-events: none;
-    z-index: 25;
-    animation: skipPop 0.45s ease forwards;
+/* התאמת וידאו */
+.video-container video:fullscreen {
+    width: 100vw;
+    height: 100vh;
+    object-fit: contain;
 }
 
 /* חלון מעבר אוטומטי לפרק הבא (רעיון 1) */

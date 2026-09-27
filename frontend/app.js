@@ -49,11 +49,6 @@ const elements = {
     html5Player: document.getElementById('html5-player'),
     playerOpenVlcBtn: document.getElementById('player-open-vlc-btn'),
     playerFullscreenBtn: document.getElementById('player-fullscreen-btn'),
-    btnSkipBackward: document.getElementById('btn-skip-backward'),
-    btnSkipForward: document.getElementById('btn-skip-forward'),
-    btnSkipFullscreen: document.getElementById('btn-skip-fullscreen'),
-    onVideoControls: document.getElementById('on-video-controls'),
-    skipFeedback: document.getElementById('skip-feedback'),
 
     // מודל מעבר אוטומטי לפרק הבא (רעיון 1)
     nextEpOverlay: document.getElementById('next-ep-overlay'),
@@ -111,51 +106,17 @@ function initEventListeners() {
     // סגירת נגן
     elements.closePlayerModal.addEventListener('click', tryClosePlayerWithPrompt);
 
-    // מסך מלא (Fullscreen) – כפתור עליון וכפתור על הווידאו
+    // מסך מלא (Fullscreen) – כפתור עליון ודאבל קליק
     if (elements.playerFullscreenBtn) {
         elements.playerFullscreenBtn.addEventListener('click', toggleContainerFullscreen);
     }
-    if (elements.btnSkipFullscreen) {
-        elements.btnSkipFullscreen.addEventListener('click', toggleContainerFullscreen);
-    }
 
-    // דאבל קליק על מיכל הווידאו למסך מלא
-    if (elements.videoContainer) {
-        elements.videoContainer.addEventListener('dblclick', (e) => {
-            if (e.target.closest('button')) return;
+    if (elements.html5Player) {
+        elements.html5Player.addEventListener('dblclick', (e) => {
+            e.preventDefault();
             toggleContainerFullscreen();
         });
-
-        // הצגת כפתורי הדילוג בתנועת עכבר והסתרתם בחוסר פעילות
-        let controlsHideTimeout = null;
-        elements.videoContainer.addEventListener('mousemove', () => {
-            if (elements.onVideoControls) {
-                elements.onVideoControls.classList.add('visible');
-                clearTimeout(controlsHideTimeout);
-                controlsHideTimeout = setTimeout(() => {
-                    if (!elements.html5Player.paused) {
-                        elements.onVideoControls.classList.remove('visible');
-                    }
-                }, 2200);
-            }
-        });
-        elements.videoContainer.addEventListener('mouseleave', () => {
-            if (elements.onVideoControls && !elements.html5Player.paused) {
-                elements.onVideoControls.classList.remove('visible');
-            }
-        });
     }
-
-    // אם הדפדפן נכנס למסך מלא רק על הווידאו, נעביר אותו למיכל השלם כדי שכל הכפתורים יישארו על המסך
-    document.addEventListener('fullscreenchange', () => {
-        if (document.fullscreenElement === elements.html5Player) {
-            if (document.exitFullscreen) {
-                document.exitFullscreen().then(() => {
-                    elements.videoContainer.requestFullscreen().catch(() => {});
-                }).catch(() => {});
-            }
-        }
-    });
 
     // ביטול מוחלט של התנהגות החצים המובנית של הדפדפן על נגן הווידאו למניעת דילוג כפול (יותר מ-10 שניות)
     elements.html5Player.addEventListener('keydown', (e) => {
@@ -164,16 +125,6 @@ function initEventListeners() {
             e.stopPropagation();
             e.stopImmediatePropagation();
         }
-    });
-
-    // דילוג 10 שניות קדימה ואחורה בלחיצה על הכפתורים
-    elements.btnSkipBackward.addEventListener('click', (e) => {
-        e.stopPropagation();
-        skipTime(-10);
-    });
-    elements.btnSkipForward.addEventListener('click', (e) => {
-        e.stopPropagation();
-        skipTime(10);
     });
 
     // כפתורי מעבר לפרק הבא (רעיון 1)
@@ -294,16 +245,16 @@ function handleGlobalKeyControls(e) {
     }
 }
 
-// מעבר למסך מלא (על כל המיכל כולל הכפתורים)
+// מעבר למסך מלא
 function toggleContainerFullscreen() {
-    const vc = elements.videoContainer;
-    if (!vc) return;
+    const p = elements.html5Player;
+    if (!p) return;
 
     if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-        if (vc.requestFullscreen) {
-            vc.requestFullscreen().catch(() => {});
-        } else if (vc.webkitRequestFullscreen) {
-            vc.webkitRequestFullscreen();
+        if (p.requestFullscreen) {
+            p.requestFullscreen().catch(() => {});
+        } else if (p.webkitRequestFullscreen) {
+            p.webkitRequestFullscreen();
         }
     } else {
         if (document.exitFullscreen) {
@@ -323,8 +274,7 @@ function togglePlayPause() {
     }
 }
 
-// פונקציות דילוג 10 שניות בדיוק ואנימציית משוב
-let feedbackTimeout = null;
+// פונקציית דילוג 10 שניות בדיוק (שקט, חלק וללא שום כיתובים על המסך)
 function skipTime(seconds) {
     if (!elements.html5Player) return;
     const cur = elements.html5Player.currentTime || 0;
@@ -338,20 +288,6 @@ function skipTime(seconds) {
     }
 
     elements.html5Player.currentTime = target;
-    showSkipFeedback(seconds > 0 ? `⏩ +10 שניות` : `⏪ 10- שניות`);
-}
-
-function showSkipFeedback(text) {
-    if (!elements.skipFeedback) return;
-    elements.skipFeedback.textContent = text;
-    elements.skipFeedback.classList.remove('hidden');
-    elements.skipFeedback.style.animation = 'none';
-    elements.skipFeedback.offsetHeight; /* trigger reflow */
-    elements.skipFeedback.style.animation = null;
-    clearTimeout(feedbackTimeout);
-    feedbackTimeout = setTimeout(() => {
-        elements.skipFeedback.classList.add('hidden');
-    }, 450);
 }
 
 // קבלת נתונים מהשרת
