@@ -47,6 +47,9 @@ const elements = {
     playerTitle: document.getElementById('player-title'),
     html5Player: document.getElementById('html5-player'),
     playerOpenVlcBtn: document.getElementById('player-open-vlc-btn'),
+    btnSkipBackward: document.getElementById('btn-skip-backward'),
+    btnSkipForward: document.getElementById('btn-skip-forward'),
+    skipFeedback: document.getElementById('skip-feedback'),
 
     // מודל שאלת סימון נצפה
     watchedPromptModal: document.getElementById('watched-prompt-modal'),
@@ -97,7 +100,32 @@ function initEventListeners() {
     // סגירת נגן
     elements.closePlayerModal.addEventListener('click', tryClosePlayerWithPrompt);
 
+    // דילוג 10 שניות קדימה ואחורה
+    elements.btnSkipBackward.addEventListener('click', () => skipTime(-10));
+    elements.btnSkipForward.addEventListener('click', () => skipTime(10));
+
     window.addEventListener('keydown', (e) => {
+        // קיצורי מקשים בזמן שנגן הווידאו פתוח
+        if (!elements.playerModal.classList.contains('hidden')) {
+            if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                skipTime(10);
+                return;
+            } else if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                skipTime(-10);
+                return;
+            } else if (e.key === ' ') {
+                e.preventDefault();
+                if (elements.html5Player.paused) {
+                    elements.html5Player.play();
+                } else {
+                    elements.html5Player.pause();
+                }
+                return;
+            }
+        }
+
         if (e.key === 'Escape') {
             if (!elements.watchedPromptModal.classList.contains('hidden')) {
                 elements.watchedPromptModal.classList.add('hidden');
@@ -143,6 +171,30 @@ function initEventListeners() {
             elements.watchedPromptModal.classList.remove('hidden');
         }
     });
+}
+
+// פונקציות דילוג 10 שניות ואנימציית משוב
+let feedbackTimeout = null;
+function skipTime(seconds) {
+    if (!elements.html5Player) return;
+    const cur = elements.html5Player.currentTime || 0;
+    const dur = elements.html5Player.duration || Infinity;
+    elements.html5Player.currentTime = Math.max(0, Math.min(dur, cur + seconds));
+    
+    showSkipFeedback(seconds > 0 ? `⏩ +${seconds} שניות` : `⏪ ${seconds} שניות`);
+}
+
+function showSkipFeedback(text) {
+    if (!elements.skipFeedback) return;
+    elements.skipFeedback.textContent = text;
+    elements.skipFeedback.classList.remove('hidden');
+    elements.skipFeedback.style.animation = 'none';
+    elements.skipFeedback.offsetHeight; /* trigger reflow */
+    elements.skipFeedback.style.animation = null;
+    clearTimeout(feedbackTimeout);
+    feedbackTimeout = setTimeout(() => {
+        elements.skipFeedback.classList.add('hidden');
+    }, 450);
 }
 
 // קבלת נתונים מהשרת
@@ -450,7 +502,8 @@ function tryClosePlayerWithPrompt() {
 
 function closePlayer() {
     elements.html5Player.pause();
-    elements.html5Player.src = '';
+    elements.html5Player.removeAttribute('src');
+    elements.html5Player.load();
     elements.playerModal.classList.add('hidden');
     clearInterval(state.playbackTimer);
     state.currentPlayingEpisode = null;

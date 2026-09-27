@@ -128,6 +128,14 @@
                     <h3 id="player-title">שם הסדרה - פרק 1</h3>
                 </div>
                 <div class="player-actions">
+                    <div class="player-skip-group">
+                        <button class="btn-bubble btn-skip" id="btn-skip-backward" title="דלגי 10 שניות אחורה (חץ שמאלה)">
+                            ⏪ 10-
+                        </button>
+                        <button class="btn-bubble btn-skip" id="btn-skip-forward" title="דלגי 10 שניות קדימה (חץ ימינה)">
+                            ⏩ 10+
+                        </button>
+                    </div>
                     <button class="btn-bubble btn-bubble-soft" id="player-open-vlc-btn">
                         פתח ב-VLC / נגן מחשב
                     </button>
@@ -137,10 +145,7 @@
 
             <div class="video-container">
                 <video id="html5-player" controls preload="auto" playsinline></video>
-            </div>
-
-            <div class="player-tip">
-                <span>✨ הווידאו מוזרם מהמחשב באיכות 100% מקורית ללא שום כיווץ!</span>
+                <div class="skip-feedback hidden" id="skip-feedback"></div>
             </div>
         </div>
     </div>

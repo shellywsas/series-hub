@@ -858,7 +858,29 @@ body {
     transform: scale(1.1) rotate(90deg);
 }
 
+.player-skip-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-skip {
+    background: #fdf2f8;
+    color: var(--pastel-rose);
+    border: 2px solid var(--pastel-pink);
+    font-size: 13px;
+    padding: 8px 14px;
+}
+
+.btn-skip:hover {
+    background: var(--pastel-rose);
+    color: #ffffff;
+    border-color: var(--pastel-rose);
+    transform: translateY(-2px) scale(1.05);
+}
+
 .video-container {
+    position: relative;
     background: #000000;
     width: 100%;
     display: flex;
@@ -872,13 +894,28 @@ body {
     outline: none;
 }
 
-.player-tip {
-    padding: 12px 24px;
-    background: #fff5f9;
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--text-medium);
-    text-align: center;
+.skip-feedback {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(46, 38, 56, 0.75);
+    backdrop-filter: blur(8px);
+    border: 2px solid var(--pastel-pink);
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: 900;
+    padding: 14px 28px;
+    border-radius: var(--radius-pill);
+    pointer-events: none;
+    z-index: 10;
+    animation: skipPop 0.45s ease forwards;
+}
+
+@keyframes skipPop {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.7); }
+    50% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
 }
 
 /* Prompt אישור סימון כנצפה ביציאה */
