@@ -3,222 +3,180 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SeriesHub | נטפליקס מקומי</title>
+    <title>SeriesHub ✨ הנטפליקס החמודי שלך</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800;900&family=Varela+Round&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- רקע ניאון זוהר וגלים מטושטשים -->
-    <div class="glow-bg glow-purple"></div>
-    <div class="glow-bg glow-cyan"></div>
+    <!-- רקע פסטלי חלומי ובועות רכות -->
+    <div class="pastel-bubble bubble-pink"></div>
+    <div class="pastel-bubble bubble-purple"></div>
+    <div class="pastel-bubble bubble-mint"></div>
 
-    <div class="app-container">
-        <!-- סרגל עליון (Header) -->
-        <header class="navbar glass">
-            <div class="nav-brand">
-                <div class="brand-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                    </svg>
-                </div>
+    <div class="app-wrap">
+        <!-- סרגל עליון מתוק וכיפי (ללא כפתורים מיותרים משמאל) -->
+        <header class="top-nav">
+            <div class="brand">
+                <div class="brand-avatar">🍿</div>
                 <div>
-                    <h1 class="brand-title">Series<span>Hub</span></h1>
-                    <p class="brand-subtitle">הספרייה הביתית שלך</p>
+                    <h1 class="brand-name">Series<span class="hub-pill">Hub</span> <span class="sparkle">✨</span></h1>
+                    <p class="brand-tagline">הסדרות האהובות עלייך, הכי כיף שיש!</p>
                 </div>
             </div>
 
-            <!-- סטטיסטיקה מהירה -->
-            <div class="stats-bar glass-inner">
-                <div class="stat-pill">
-                    <span class="stat-num" id="stat-series">0</span>
-                    <span class="stat-label">סדרות</span>
+            <!-- סטטיסטיקות סוכרייה -->
+            <div class="candy-stats">
+                <div class="candy-pill pill-pink">
+                    <span class="candy-icon">🎬</span>
+                    <span class="candy-val" id="stat-series">0</span>
+                    <span class="candy-lbl">סדרות</span>
                 </div>
-                <div class="stat-divider"></div>
-                <div class="stat-pill">
-                    <span class="stat-num" id="stat-episodes">0</span>
-                    <span class="stat-label">פרקים</span>
+                <div class="candy-pill pill-purple">
+                    <span class="candy-icon">🍿</span>
+                    <span class="candy-val" id="stat-episodes">0</span>
+                    <span class="candy-lbl">פרקים</span>
                 </div>
-                <div class="stat-divider"></div>
-                <div class="stat-pill">
-                    <span class="stat-num highlight" id="stat-watched">0</span>
-                    <span class="stat-label">נצפו</span>
+                <div class="candy-pill pill-mint">
+                    <span class="candy-icon">💖</span>
+                    <span class="candy-val" id="stat-watched">0</span>
+                    <span class="candy-lbl">נצפו</span>
                 </div>
-            </div>
-
-            <!-- פעולות מערכת -->
-            <div class="nav-actions">
-                <button class="btn btn-glass" id="btn-organize" title="ארגן קבצים בתיקיות מסודרות בהורדות (בלי למחוק שום קובץ)">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-                    </svg>
-                    <span>ארגן תיקיות</span>
-                </button>
-                <button class="btn btn-glass" id="btn-rescan" title="סרוק מחדש את תיקיית ההורדות">
-                    <svg id="rescan-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="23 4 23 10 17 10"></polyline>
-                        <polyline points="1 20 1 14 7 14"></polyline>
-                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                    </svg>
-                    <span>רענן ספריה</span>
-                </button>
             </div>
         </header>
 
-        <!-- אזור חיפוש וסינון -->
-        <section class="controls-section">
-            <div class="search-box glass">
-                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-                <input type="text" id="search-input" placeholder="חיפוש סדרה (האי, שכונה, פלמ''ח, חצויה...)" autocomplete="off">
-                <button id="clear-search" class="btn-clear hidden">✕</button>
+        <!-- אזור חיפוש וטאבים פסטליים -->
+        <section class="search-and-filters">
+            <div class="pastel-search">
+                <span class="search-emoji">🔍</span>
+                <input type="text" id="search-input" placeholder="חפשי סדרה... (האי, שכונה, חצויה, פלמ''ח...)" autocomplete="off">
+                <button id="clear-search" class="clear-btn hidden">✕</button>
             </div>
 
-            <div class="filter-chips">
-                <button class="chip active" data-filter="all">הכל</button>
-                <button class="chip" data-filter="unwatched">טרם נצפה</button>
-                <button class="chip" data-filter="in-progress">בתהליך צפייה</button>
-                <button class="chip" data-filter="completed">הושלמו</button>
+            <div class="filter-tabs">
+                <button class="pastel-tab active" data-filter="all">הכל ✨</button>
+                <button class="pastel-tab" data-filter="unwatched">טרם נצפו 🌸</button>
+                <button class="pastel-tab" data-filter="in-progress">באמצע צפייה 🍿</button>
+                <button class="pastel-tab" data-filter="completed">הושלמו 🎉</button>
+                <button class="pastel-tab pill-song-tab" data-filter="songs">שירים ויצירות AI 🎵</button>
             </div>
         </section>
 
-        <!-- המשך צפייה (באנר אחרון שנצפה אם קיים) -->
-        <section id="last-watched-section" class="last-watched-container hidden">
-            <div class="last-watched-card glass">
-                <div class="lw-badge">המשך מאיפה שעצרת 🍿</div>
-                <div class="lw-info">
+        <!-- באנר המשך צפייה מתוק -->
+        <section id="last-watched-section" class="resume-banner hidden">
+            <div class="resume-card">
+                <div class="resume-art">🎀</div>
+                <div class="resume-details">
+                    <span class="resume-tag">המשך צפייה כיפי 🍿</span>
                     <h3 id="lw-title">שם הסדרה</h3>
-                    <p id="lw-subtitle">עונה 1 · פרק 3</p>
+                    <p id="lw-subtitle">עונה 1 · פרק 1</p>
                 </div>
-                <div class="lw-actions">
-                    <button class="btn btn-primary" id="lw-play-btn">
-                        <svg viewBox="0 0 24 24" fill="currentColor">
-                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                        </svg>
-                        <span>המשך צפייה</span>
-                    </button>
-                    <button class="btn btn-glass" id="lw-vlc-btn" title="פתח בנגן שולחני VLC">
-                        נגן מקומי
-                    </button>
+                <div class="resume-buttons">
+                    <button class="btn-bubble btn-bubble-primary" id="lw-play-btn">צפי עכשיו ✨</button>
+                    <button class="btn-bubble btn-bubble-soft" id="lw-vlc-btn">נגן במחשב (VLC)</button>
                 </div>
             </div>
         </section>
 
         <!-- גריד הסדרות הראשי -->
-        <main class="series-grid-section">
-            <div class="section-title-wrap">
-                <h2 class="section-title">כל הסדרות בספרייה</h2>
-                <span class="series-count-badge" id="visible-series-count">0 סדרות</span>
+        <main class="main-content">
+            <div class="content-header">
+                <h2 class="content-title" id="content-heading">כל הסדרות המתוקות שלך</h2>
+                <span class="badge-count" id="visible-series-count">0 סדרות</span>
             </div>
 
-            <div class="series-grid" id="series-grid">
-                <!-- כרטיסיות סדרה יווצרו כאן דינמית -->
+            <div class="cards-grid" id="series-grid">
+                <!-- כרטיסיות סדרה עם פוסטרים אמיתיים -->
             </div>
 
-            <div class="empty-state hidden" id="empty-state">
-                <div class="empty-icon">🔍</div>
-                <h3>לא נמצאו סדרות התואמות לחיפוש</h3>
-                <p>נסה לחפש בשם אחר או אפס את הסינונים</p>
+            <!-- אזור שירים ויצירות אישיות -->
+            <div class="songs-grid hidden" id="songs-grid">
+                <!-- רשימת שירים מופרדת עם שמות מלאים -->
+            </div>
+
+            <div class="empty-box hidden" id="empty-state">
+                <div class="empty-emoji">🥺</div>
+                <h3>לא מצאנו תוצאות מתאימות</h3>
+                <p>נסי לחפש משהו אחר או לחצי על 'הכל'</p>
             </div>
         </main>
     </div>
 
-    <!-- מודל פירוט סדרה ועונות -->
-    <div class="modal-backdrop hidden" id="series-modal">
-        <div class="series-modal-content glass">
-            <button class="modal-close" id="close-series-modal">✕</button>
-            
-            <div class="modal-hero" id="modal-hero">
-                <div class="modal-hero-badge" id="modal-formats-badge">MP4</div>
-                <h2 class="modal-title" id="modal-series-name">שם הסדרה</h2>
-                <div class="modal-meta">
-                    <span id="modal-seasons-count">3 עונות</span>
-                    <span class="meta-dot">·</span>
-                    <span id="modal-episodes-count">48 פרקים</span>
-                    <span class="meta-dot">·</span>
-                    <span id="modal-watched-progress">0% נצפו</span>
+    <!-- מודל סדרה ועונות (ללא גלילות כפולות!) -->
+    <div class="modal-overlay hidden" id="series-modal">
+        <div class="modal-card modal-series">
+            <button class="btn-close-modal" id="close-series-modal" title="סגור">✕</button>
+
+            <div class="series-popup-header">
+                <div class="popup-poster-wrap">
+                    <img id="modal-poster-img" class="popup-poster" src="" alt="פוסטר סדרה">
+                </div>
+                <div class="popup-info">
+                    <div class="popup-badges">
+                        <span class="pastel-badge" id="modal-formats-badge">HD</span>
+                        <span class="pastel-badge badge-rose" id="modal-seasons-count">0 עונות</span>
+                        <span class="pastel-badge badge-purple" id="modal-episodes-count">0 פרקים</span>
+                    </div>
+                    <h2 class="popup-title" id="modal-series-name">שם הסדרה</h2>
+                    <div class="popup-progress-wrap">
+                        <div class="popup-progress-text">
+                            <span id="modal-watched-progress">0% נצפו</span>
+                            <span>💖</span>
+                        </div>
+                        <div class="candy-track">
+                            <div class="candy-bar" id="modal-progress-bar" style="width: 0%;"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- כרטיסיות עונה -->
-            <div class="seasons-tabs" id="seasons-tabs">
-                <!-- טאבים של עונות -->
+            <!-- טאבים של עונות -->
+            <div class="season-pill-list" id="seasons-tabs">
+                <!-- טאבי עונות פסטליים -->
             </div>
 
             <!-- רשימת פרקים -->
-            <div class="episodes-container">
-                <div class="episodes-header">
+            <div class="season-episodes-box">
+                <div class="episodes-subhead">
                     <h3 id="current-season-title">עונה 1</h3>
-                    <span class="episodes-count" id="current-season-count">10 פרקים</span>
+                    <span id="current-season-count">0 פרקים</span>
                 </div>
-                <div class="episodes-list" id="episodes-list">
-                    <!-- רשימת פרקים דינמית -->
+                <div class="episodes-scroll-list" id="episodes-list">
+                    <!-- שורות פרקים -->
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- מודל נגן וידאו מובנה בדפדפן -->
-    <div class="modal-backdrop hidden" id="player-modal">
-        <div class="player-modal-content glass">
-            <div class="player-header">
-                <div class="player-title-info">
-                    <span class="player-now-playing">מנגן כעת:</span>
+    <!-- מודל נגן וידאו מובנה ומהיר באיכות מקורית -->
+    <div class="modal-overlay hidden" id="player-modal">
+        <div class="modal-card modal-player">
+            <div class="player-top">
+                <div class="player-titles">
+                    <span class="player-label">צופה כעת בכיף:</span>
                     <h3 id="player-title">שם הסדרה - עונה 1 פרק 1</h3>
                 </div>
-                <div class="player-controls-right">
-                    <button class="btn btn-sm btn-glass" id="player-open-vlc-btn">
-                        פתח ב-VLC / נגן חיצוני
+                <div class="player-actions">
+                    <button class="btn-bubble btn-bubble-soft" id="player-open-vlc-btn">
+                        פתח ב-VLC / נגן מחשב
                     </button>
-                    <button class="modal-close-player" id="close-player-modal">✕</button>
+                    <button class="btn-close-modal" id="close-player-modal">✕</button>
                 </div>
             </div>
-            <div class="video-wrapper">
-                <video id="html5-player" controls preload="metadata"></video>
+
+            <div class="video-container">
+                <video id="html5-player" controls preload="auto" playsinline></video>
             </div>
-            <div class="player-footer">
-                <span class="tip-text">💡 טיפ: לניגון מיטבי של קבצי MKV/AVI עם קידודים כבדים, השתמש בכפתור 'פתח ב-VLC'</span>
+
+            <div class="player-tip">
+                <span>✨ הווידאו מוזרם מהמחשב באיכות 100% מקורית. לקבצי AVI/MKV ישירות בנגן המחשב לחצי על 'פתח ב-VLC'!</span>
             </div>
         </div>
     </div>
 
-    <!-- מודל ארגון קבצים בטוח -->
-    <div class="modal-backdrop hidden" id="organize-modal">
-        <div class="organize-modal-content glass">
-            <button class="modal-close" id="close-organize-modal">✕</button>
-            <div class="organize-header">
-                <div class="organize-icon">📁</div>
-                <h2>ארגון מסודר של תיקיית ההורדות</h2>
-                <p>סידור אוטומטי של כל פרקי הסדרות לתיקיות נפרדות לפי <b>סדרה</b> ו<b>עונה</b>.</p>
-            </div>
-
-            <div class="safety-banner glass-inner">
-                <span class="shield-icon">🛡️</span>
-                <div>
-                    <strong>בטיחות מלאה 100%:</strong>
-                    <p>אף קובץ לא יימחק, שום כפילות לא תימחק, ושום מידע לא יאבד. הכל מסודר בנתיב:</p>
-                    <code>C:\Users\shell\Downloads\סדרות\&lt;סדרה&gt;\עונה &lt;מספר&gt;\</code>
-                </div>
-            </div>
-
-            <div class="organize-preview-box" id="organize-preview">
-                <div class="loading-spinner">טוען תצוגה מקדימה...</div>
-            </div>
-
-            <div class="modal-actions">
-                <button class="btn btn-glass" id="btn-cancel-organize">ביטול</button>
-                <button class="btn btn-primary" id="btn-confirm-organize">
-                    <span>בצע ארגון עכשיו</span>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- הודעות קופצות (Toasts) -->
-    <div class="toast-container" id="toast-container"></div>
+    <!-- התראות פופ-אפ מתוקות (Toasts) -->
+    <div class="candy-toast-tray" id="toast-container"></div>
 
     <script src="app.js"></script>
 </body>

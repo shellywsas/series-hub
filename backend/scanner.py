@@ -9,6 +9,7 @@ VIDEO_EXTENSIONS = ('.mp4', '.mkv', '.avi', '.mov', '.webm', '.ts')
 SERIES_ALIASES = {
     'gingi-2015': "ג'ינג'י",
     'gingi': "ג'ינג'י",
+    'גינגי': "ג'ינג'י",
     'shchuna': 'שכונה',
     'ha-nephilim': 'הנפילים',
     'hanephilim': 'הנפילים',
@@ -29,17 +30,41 @@ SERIES_ALIASES = {
     'התחנה': 'התחנה',
     'אילת': 'אילת',
     'בני ערובה': 'בני ערובה',
+    'בני.ערובה': 'בני ערובה',
+    'בני_ערובה': 'בני ערובה',
+}
+
+# שמות תמונות פוסטר שמורות מקומית
+POSTER_FILES = {
+    "האי": "posters/האי.jpg",
+    "שכונה": "posters/שכונה.jpg",
+    "חצויה": "posters/חצויה.jpg",
+    "פלמ\"ח": "posters/פלמח.jpg",
+    "פלמ''ח": "posters/פלמח.jpg",
+    "נעלמים": "posters/נעלמים.jpg",
+    "ספיידרז": "posters/ספיידרז.jpg",
+    "אליפים": "posters/אליפים.jpg",
+    "כדברא": "posters/כדברא.jpg",
+    "החממה": "posters/החממה.jpg",
+    "הנפילים": "posters/הנפילים.jpg",
+    "אילת": "posters/אילת.jpg",
+    "התחנה": "posters/התחנה.jpg",
+    "סקיי": "posters/סקיי.jpg",
+    "כפולה": "posters/כפולה.jpg",
+    "בני ערובה": "posters/בני_ערובה.jpg",
+    "ג'ינג'י": "posters/גינגי.jpg",
+    "Quantum Leap": "posters/Quantum_Leap.jpg"
 }
 
 # קידומות מפיצים ואיכויות להסרה משם הקובץ
 RELEASE_PREFIXES = [
-    r'^(?:1080p|720p|480p|360p)\s+נתי\s+מדיה\s+',
-    r'^נתי\s+מדיה\s+',
-    r'^יוסי\s+סרטים\s+',
-    r'^לולו_סרטים_',
-    r'^קינג סרט\s*',
+    r'^(?:1080p|720p|480p|360p)[_\s]+נתי[_\s]+מדיה[_\s]+',
+    r'^נתי[_\s]+מדיה[_\s]+',
+    r'^יוסי[_\s]+סרטים[_\s]+',
+    r'^לולו[_\s]+סרטים[_\s]+',
+    r'^קינג[_\s]+סרט\s*',
     r'^סדרות\s+',
-    r'^אבי סרטים\s*-\s*',
+    r'^אבי[_\s]+סרטים\s*-\s*',
     r'^ISrTeLeG\s*-\s*',
 ]
 
@@ -53,12 +78,10 @@ QUALITY_TAGS = [
 
 def clean_series_name(name: str) -> str:
     name = name.strip()
-    # הסרת קידומות נותרות
     for p in RELEASE_PREFIXES:
         name = re.sub(p, '', name, flags=re.IGNORECASE).strip()
     name = re.sub(r'[_\.]+', ' ', name).strip()
     
-    # בדיקת מילון שמות
     name_lower = name.lower()
     for alias, standard in SERIES_ALIASES.items():
         if name_lower == alias.lower() or name_lower.startswith(alias.lower()):
@@ -73,17 +96,26 @@ def parse_episode_filename(filename: str) -> Optional[Dict[str, Any]]:
     if ext.lower() not in VIDEO_EXTENSIONS:
         return None
     
-    # התעלמות מווידאו שאינו סדרה (כמו סרטוני וואטסאפ)
+    # התעלמות מווידאו שאינו שייך
     if base.lower().startswith('whatsapp video'):
         return None
 
     clean = base
-    # הסרת קידומות מפיצים
     for prefix in RELEASE_PREFIXES:
         clean = re.sub(prefix, '', clean, flags=re.IGNORECASE).strip()
 
-    # בדיקת זיהוי עונה ופרק במגוון תבניות:
-    
+    # תבנית מיוחדת עם נקודות כגון: בני.ערובה.ע1פ1
+    m_dots = re.search(r'^(בני[\._]ערובה)[\._]ע(\d+)פ(\d+)', clean)
+    if m_dots:
+        return {
+            'series': 'בני ערובה',
+            'season': int(m_dots.group(2)),
+            'episode': str(int(m_dots.group(3))),
+            'episode_num': int(m_dots.group(3)),
+            'filename': filename,
+            'format': ext.lower().replace('.', '').upper()
+        }
+
     # תבנית 1: שמות לועזיים כגון gingi-2015.S1E10_480P או shchuna.S1E43
     m1 = re.search(r'^(.*?)[._\-\s]+[sS](\d+)[eE](\d+)(?:[+_\-](\d+))?', clean)
     if m1:
@@ -107,7 +139,7 @@ def parse_episode_filename(filename: str) -> Optional[Dict[str, Any]]:
     if m2:
         series_raw = m2.group(1).strip('_ ')
         if not series_raw:
-            series_raw = "ללא שם סדרה"
+            series_raw = "פרקים בודדים"
         season = int(m2.group(2))
         ep1 = int(m2.group(3))
         ep2 = int(m2.group(4)) if m2.group(4) else None
@@ -127,7 +159,7 @@ def parse_episode_filename(filename: str) -> Optional[Dict[str, Any]]:
     if m3:
         series_raw = m3.group(1).strip('_ ')
         if not series_raw:
-            series_raw = "ללא שם סדרה"
+            series_raw = "פרקים בודדים"
         season = int(m3.group(2))
         ep1 = int(m3.group(3))
         ep2 = int(m3.group(4)) if m3.group(4) else None
@@ -142,11 +174,11 @@ def parse_episode_filename(filename: str) -> Optional[Dict[str, Any]]:
             'format': ext.lower().replace('.', '').upper()
         }
 
-    # תבנית 4: רק "עונה X פרק Y" ללא שם סדרה
+    # תבנית 4: רק "עונה X פרק Y"
     m4 = re.search(r'עונה[_\s]*(\d+)[_\s]+פרק[_\s]*(\d+)', clean)
     if m4:
         return {
-            'series': 'פרקים ללא זיהוי סדרה',
+            'series': 'פרקים בודדים',
             'season': int(m4.group(1)),
             'episode': str(int(m4.group(2))),
             'episode_num': int(m4.group(2)),
@@ -154,33 +186,28 @@ def parse_episode_filename(filename: str) -> Optional[Dict[str, Any]]:
             'format': ext.lower().replace('.', '').upper()
         }
 
-    # אם הקובץ וידאו אך לא זוהתה עונה/פרק (סרט בודד או מיוחד)
+    # שירים, קליפים ופרויקטים אישיים (לא סדרות)
     clean_title = re.sub(r'[_.]', ' ', clean).strip()
-    for q in QUALITY_TAGS:
-        clean_title = re.sub(q, '', clean_title, flags=re.IGNORECASE)
-    
     return {
-        'series': 'סרטים ותכנים נוספים',
+        'series': 'שירים ויצירות אישיות',
         'season': 1,
         'episode': '1',
         'episode_num': 1,
         'filename': filename,
         'title': clean_title,
-        'format': ext.lower().replace('.', '').upper()
+        'format': ext.lower().replace('.', '').upper(),
+        'is_song_or_misc': True
     }
 
 
 def scan_directory(directory_path: str) -> Dict[str, Any]:
-    """
-    סורק את התיקייה בצורה בטוחה (Read-Only) ומקבץ את כל הסדרות, העונות והפרקים.
-    """
     if not os.path.exists(directory_path):
-        return {'series': {}, 'total_episodes': 0, 'total_series': 0}
+        return {'series': {}, 'total_episodes': 0, 'total_series': 0, 'misc_items': []}
 
     series_dict: Dict[str, Any] = {}
+    misc_items: List[Dict[str, Any]] = []
     total_episodes = 0
 
-    # סריקה רקורסיבית (כולל תתי-תיקיות אם יש)
     for root, _, files in os.walk(directory_path):
         for f in files:
             ext = os.path.splitext(f)[1].lower()
@@ -195,15 +222,36 @@ def scan_directory(directory_path: str) -> Dict[str, Any]:
                 except OSError:
                     file_size = 0
                 
-                # יצירת מזהה ייחודי לפרק
                 file_id = hashlib.md5(full_path.encode('utf-8')).hexdigest()[:12]
                 
+                # אם מדובר בשיר/יצירה אישית ולא בסדרה
+                if meta.get('is_song_or_misc'):
+                    misc_items.append({
+                        'id': file_id,
+                        'title': meta.get('title', f),
+                        'filename': f,
+                        'path': full_path,
+                        'format': meta['format'],
+                        'size_mb': round(file_size / (1024 * 1024), 1),
+                        'is_playable_in_browser': meta['format'] in ('MP4', 'WEBM')
+                    })
+                    continue
+
                 series_name = meta['series']
                 season_num = meta['season']
                 
                 if series_name not in series_dict:
+                    # בדיקת פוסטר רשמי
+                    poster_url = POSTER_FILES.get(series_name)
+                    if not poster_url:
+                        for s_k, p_v in POSTER_FILES.items():
+                            if s_k.replace('"', '').replace("'", "") == series_name.replace('"', '').replace("'", ""):
+                                poster_url = p_v
+                                break
+
                     series_dict[series_name] = {
                         'name': series_name,
+                        'poster': poster_url,
                         'seasons': {},
                         'total_episodes': 0,
                         'formats': set()
@@ -231,7 +279,7 @@ def scan_directory(directory_path: str) -> Dict[str, Any]:
                 series_dict[series_name]['formats'].add(meta['format'])
                 total_episodes += 1
 
-    # מיון הפרקים בכל עונה לפי מספר הפרק
+    # מיון הפרקים
     for s_name, s_data in series_dict.items():
         s_data['formats'] = list(s_data['formats'])
         for s_num in s_data['seasons']:
@@ -240,18 +288,6 @@ def scan_directory(directory_path: str) -> Dict[str, Any]:
     return {
         'series': series_dict,
         'total_episodes': total_episodes,
-        'total_series': len(series_dict)
+        'total_series': len(series_dict),
+        'misc_items': misc_items
     }
-
-if __name__ == '__main__':
-    # בדיקה מהירה מול תיקיית ההורדות
-    import sys
-    sys.stdout.reconfigure(encoding='utf-8')
-    downloads_dir = r'C:\Users\shell\Downloads'
-    result = scan_directory(downloads_dir)
-    print(f"Total Series: {result['total_series']}")
-    print(f"Total Episodes: {result['total_episodes']}")
-    print("\nSeries Breakdown:")
-    for name, data in sorted(result['series'].items(), key=lambda x: -x[1]['total_episodes']):
-        seasons_str = ", ".join([f"עונה {s} ({len(eps)} פרקים)" for s, eps in sorted(data['seasons'].items())])
-        print(f"• {name}: {data['total_episodes']} פרקים [{seasons_str}] - פורמטים: {data['formats']}")
