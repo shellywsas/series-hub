@@ -1,6 +1,7 @@
 import os
 import sys
 import re
+import asyncio
 import mimetypes
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -12,7 +13,7 @@ from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
 from pydantic import BaseModel
 
 from scanner import scan_directory, clean_series_name
-from database import load_watched_data, toggle_watched, toggle_favorite, set_last_watched
+from database import load_watched_data, toggle_watched, toggle_favorite, save_progress, get_progress, set_last_watched
 
 DOWNLOADS_DIR = r"C:\Users\shell\Downloads"
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
@@ -27,13 +28,27 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+import time
+
 CACHE = {
     "data": None,
-    "file_map": {}
+    "file_map": {},
+    "last_mtime": 0,
+    "last_scan_time": 0
 }
 
 def get_scanned_data(force: bool = False):
-    if CACHE["data"] is None or force:
+    # בדיקת עדכון תיקיית ההורדות לפי זמן שינוי אחרון (mtime) או בדיקה שוטפת כל 12 שניות
+    current_mtime = 0
+    try:
+        current_mtime = os.path.getmtime(DOWNLOADS_DIR)
+    except OSError:
+        pass
+
+    now = time.time()
+    time_since_last_scan = now - CACHE.get("last_scan_time", 0)
+
+    if CACHE["data"] is None or force or (current_mtime > CACHE["last_mtime"]) or (time_since_last_scan > 12):
         res = scan_directory(DOWNLOADS_DIR)
         file_map = {}
         for s_name, s_data in res["series"].items():
@@ -44,7 +59,21 @@ def get_scanned_data(force: bool = False):
             file_map[m["id"]] = m
         CACHE["data"] = res
         CACHE["file_map"] = file_map
+        CACHE["last_mtime"] = current_mtime
+        CACHE["last_scan_time"] = now
     return CACHE["data"]
+
+@app.on_event("startup")
+async def startup_watcher():
+    # משימת רקע שסורקת אוטומטית הורדות חדשות כל 12 שניות
+    async def watcher():
+        while True:
+            await asyncio.sleep(12)
+            try:
+                get_scanned_data(force=False)
+            except Exception:
+                pass
+    asyncio.create_task(watcher())
 
 @app.get("/api/stats")
 def get_stats():
@@ -70,6 +99,7 @@ def list_series():
     watched_data = load_watched_data()
     watched_map = watched_data.get("watched_episodes", {})
     favs_map = watched_data.get("favorites", {})
+    timestamps_map = watched_data.get("timestamps", {})
 
     result = []
     for name, s in sorted(data["series"].items(), key=lambda x: -x[1]["total_episodes"]):
@@ -100,6 +130,7 @@ def list_series():
             ep_item = dict(CACHE["file_map"][ep_id])
             ep_item["watched"] = watched_map.get(ep_id, False)
             ep_item["favorite"] = True
+            ep_item["timestamp"] = timestamps_map.get(ep_id, 0.0)
             favorite_episodes.append(ep_item)
 
     return {
@@ -118,6 +149,7 @@ def get_series_details(series_name: str):
     watched_data = load_watched_data()
     watched_map = watched_data.get("watched_episodes", {})
     favs_map = watched_data.get("favorites", {})
+    timestamps_map = watched_data.get("timestamps", {})
 
     seasons_data = {}
     for s_num, eps in s["seasons"].items():
@@ -126,6 +158,7 @@ def get_series_details(series_name: str):
             ep_dict = dict(ep)
             ep_dict["watched"] = watched_map.get(ep["id"], False)
             ep_dict["favorite"] = favs_map.get(ep["id"], False)
+            ep_dict["timestamp"] = timestamps_map.get(ep["id"], 0.0)
             ep_list.append(ep_dict)
         seasons_data[s_num] = ep_list
 
@@ -175,6 +208,16 @@ class ToggleFavoriteRequest(BaseModel):
 def toggle_favorite_status(req: ToggleFavoriteRequest):
     new_fav = toggle_favorite(req.id)
     return {"id": req.id, "favorite": new_fav}
+
+class ProgressRequest(BaseModel):
+    id: str
+    timestamp: float
+
+@app.post("/api/progress")
+def record_progress(req: ProgressRequest):
+    """שמירת מיקום צפייה מדויק (Resume Playback)"""
+    save_progress(req.id, req.timestamp)
+    return {"status": "success", "id": req.id, "timestamp": req.timestamp}
 
 @app.post("/api/rescan")
 def rescan():

@@ -45,11 +45,22 @@ const elements = {
     playerModal: document.getElementById('player-modal'),
     closePlayerModal: document.getElementById('close-player-modal'),
     playerTitle: document.getElementById('player-title'),
+    videoContainer: document.getElementById('video-container'),
     html5Player: document.getElementById('html5-player'),
     playerOpenVlcBtn: document.getElementById('player-open-vlc-btn'),
+    playerFullscreenBtn: document.getElementById('player-fullscreen-btn'),
     btnSkipBackward: document.getElementById('btn-skip-backward'),
     btnSkipForward: document.getElementById('btn-skip-forward'),
+    btnSkipFullscreen: document.getElementById('btn-skip-fullscreen'),
+    onVideoControls: document.getElementById('on-video-controls'),
     skipFeedback: document.getElementById('skip-feedback'),
+
+    // מודל מעבר אוטומטי לפרק הבא (רעיון 1)
+    nextEpOverlay: document.getElementById('next-ep-overlay'),
+    nextEpTitle: document.getElementById('next-ep-title'),
+    countdownNum: document.getElementById('countdown-num'),
+    btnNextNow: document.getElementById('btn-next-now'),
+    btnNextCancel: document.getElementById('btn-next-cancel'),
 
     // מודל שאלת סימון נצפה
     watchedPromptModal: document.getElementById('watched-prompt-modal'),
@@ -100,47 +111,98 @@ function initEventListeners() {
     // סגירת נגן
     elements.closePlayerModal.addEventListener('click', tryClosePlayerWithPrompt);
 
-    // דילוג 10 שניות קדימה ואחורה
-    elements.btnSkipBackward.addEventListener('click', () => skipTime(-10));
-    elements.btnSkipForward.addEventListener('click', () => skipTime(10));
+    // מסך מלא (Fullscreen) – כפתור עליון וכפתור על הווידאו
+    if (elements.playerFullscreenBtn) {
+        elements.playerFullscreenBtn.addEventListener('click', toggleContainerFullscreen);
+    }
+    if (elements.btnSkipFullscreen) {
+        elements.btnSkipFullscreen.addEventListener('click', toggleContainerFullscreen);
+    }
 
-    window.addEventListener('keydown', (e) => {
-        // קיצורי מקשים בזמן שנגן הווידאו פתוח
-        if (!elements.playerModal.classList.contains('hidden')) {
-            if (e.key === 'ArrowRight') {
-                e.preventDefault();
-                skipTime(10);
-                return;
-            } else if (e.key === 'ArrowLeft') {
-                e.preventDefault();
-                skipTime(-10);
-                return;
-            } else if (e.key === ' ') {
-                e.preventDefault();
-                if (elements.html5Player.paused) {
-                    elements.html5Player.play();
-                } else {
-                    elements.html5Player.pause();
-                }
-                return;
-            }
-        }
+    // דאבל קליק על מיכל הווידאו למסך מלא
+    if (elements.videoContainer) {
+        elements.videoContainer.addEventListener('dblclick', (e) => {
+            if (e.target.closest('button')) return;
+            toggleContainerFullscreen();
+        });
 
-        if (e.key === 'Escape') {
-            if (!elements.watchedPromptModal.classList.contains('hidden')) {
-                elements.watchedPromptModal.classList.add('hidden');
-                return;
+        // הצגת כפתורי הדילוג בתנועת עכבר והסתרתם בחוסר פעילות
+        let controlsHideTimeout = null;
+        elements.videoContainer.addEventListener('mousemove', () => {
+            if (elements.onVideoControls) {
+                elements.onVideoControls.classList.add('visible');
+                clearTimeout(controlsHideTimeout);
+                controlsHideTimeout = setTimeout(() => {
+                    if (!elements.html5Player.paused) {
+                        elements.onVideoControls.classList.remove('visible');
+                    }
+                }, 2200);
             }
-            if (!elements.playerModal.classList.contains('hidden')) {
-                tryClosePlayerWithPrompt();
-                return;
+        });
+        elements.videoContainer.addEventListener('mouseleave', () => {
+            if (elements.onVideoControls && !elements.html5Player.paused) {
+                elements.onVideoControls.classList.remove('visible');
             }
-            if (!elements.seriesFullscreenView.classList.contains('hidden')) {
-                elements.seriesFullscreenView.classList.add('hidden');
-                document.body.style.overflow = '';
+        });
+    }
+
+    // אם הדפדפן נכנס למסך מלא רק על הווידאו, נעביר אותו למיכל השלם כדי שכל הכפתורים יישארו על המסך
+    document.addEventListener('fullscreenchange', () => {
+        if (document.fullscreenElement === elements.html5Player) {
+            if (document.exitFullscreen) {
+                document.exitFullscreen().then(() => {
+                    elements.videoContainer.requestFullscreen().catch(() => {});
+                }).catch(() => {});
             }
         }
     });
+
+    // ביטול מוחלט של התנהגות החצים המובנית של הדפדפן על נגן הווידאו למניעת דילוג כפול (יותר מ-10 שניות)
+    elements.html5Player.addEventListener('keydown', (e) => {
+        if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' '].includes(e.key)) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+        }
+    });
+
+    // דילוג 10 שניות קדימה ואחורה בלחיצה על הכפתורים
+    elements.btnSkipBackward.addEventListener('click', (e) => {
+        e.stopPropagation();
+        skipTime(-10);
+    });
+    elements.btnSkipForward.addEventListener('click', (e) => {
+        e.stopPropagation();
+        skipTime(10);
+    });
+
+    // כפתורי מעבר לפרק הבא (רעיון 1)
+    if (elements.btnNextNow) {
+        elements.btnNextNow.addEventListener('click', (e) => {
+            e.stopPropagation();
+            playNextEpisodeNow();
+        });
+    }
+    if (elements.btnNextCancel) {
+        elements.btnNextCancel.addEventListener('click', (e) => {
+            e.stopPropagation();
+            cancelNextEpisodeCountdown();
+        });
+    }
+
+    // מעקב התקדמות שוטף: שמירת שנייה מדויקת + בדיקה אם להציע את הפרק הבא
+    elements.html5Player.addEventListener('timeupdate', () => {
+        handleProgressSaving();
+        checkForNextEpisodePrompt();
+    });
+
+    // מעקב סיום וידאו
+    elements.html5Player.addEventListener('ended', () => {
+        handleEpisodeEnded();
+    });
+
+    // לכידת מקשים גלובלית במצב Capture כדי לתפוס בדיוק 10 שניות בלי התערבות הדפדפן
+    window.addEventListener('keydown', handleGlobalKeyControls, true);
 
     // שאלת סימון נצפה
     elements.btnPromptYes.addEventListener('click', async () => {
@@ -150,7 +212,7 @@ function initEventListeners() {
         }
         elements.watchedPromptModal.classList.add('hidden');
         closePlayer();
-        fetchLibraryData();
+        fetchLibraryData(true);
     });
 
     elements.btnPromptNo.addEventListener('click', () => {
@@ -165,23 +227,118 @@ function initEventListeners() {
         }
     });
 
-    // מעקב סיום וידאו
-    elements.html5Player.addEventListener('ended', () => {
-        if (state.currentPlayingEpisode && !state.currentPlayingEpisode.watched) {
-            elements.watchedPromptModal.classList.remove('hidden');
+    // סנכרון אוטומטי ברקע של סדרות ופרקים חדשים שהורדו למחשב כל 20 שניות
+    setInterval(() => {
+        if (elements.playerModal.classList.contains('hidden')) {
+            fetchLibraryData(true);
+        }
+    }, 20000);
+
+    window.addEventListener('focus', () => {
+        if (elements.playerModal.classList.contains('hidden')) {
+            fetchLibraryData(true);
         }
     });
 }
 
-// פונקציות דילוג 10 שניות ואנימציית משוב
+// לכידת מקשים מדויקת
+function handleGlobalKeyControls(e) {
+    // קיצורי מקשים כשהנגן פתוח (עובד גם במסך מלא!)
+    if (!elements.playerModal.classList.contains('hidden')) {
+        if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            skipTime(10);
+            return false;
+        } else if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            skipTime(-10);
+            return false;
+        } else if (e.key === ' ') {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            togglePlayPause();
+            return false;
+        } else if (e.key === 'f' || e.key === 'F') {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleContainerFullscreen();
+            return false;
+        } else if (e.key === 'Escape') {
+            if (document.fullscreenElement || document.webkitFullscreenElement) {
+                // הדפדפן ייצא ממסך מלא לבד
+                return;
+            }
+            if (!elements.watchedPromptModal.classList.contains('hidden')) {
+                elements.watchedPromptModal.classList.add('hidden');
+                return false;
+            }
+            tryClosePlayerWithPrompt();
+            return false;
+        }
+    }
+
+    if (e.key === 'Escape') {
+        if (!elements.watchedPromptModal.classList.contains('hidden')) {
+            elements.watchedPromptModal.classList.add('hidden');
+            return;
+        }
+        if (!elements.seriesFullscreenView.classList.contains('hidden')) {
+            elements.seriesFullscreenView.classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+    }
+}
+
+// מעבר למסך מלא (על כל המיכל כולל הכפתורים)
+function toggleContainerFullscreen() {
+    const vc = elements.videoContainer;
+    if (!vc) return;
+
+    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+        if (vc.requestFullscreen) {
+            vc.requestFullscreen().catch(() => {});
+        } else if (vc.webkitRequestFullscreen) {
+            vc.webkitRequestFullscreen();
+        }
+    } else {
+        if (document.exitFullscreen) {
+            document.exitFullscreen().catch(() => {});
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+        }
+    }
+}
+
+function togglePlayPause() {
+    if (!elements.html5Player) return;
+    if (elements.html5Player.paused) {
+        elements.html5Player.play().catch(() => {});
+    } else {
+        elements.html5Player.pause();
+    }
+}
+
+// פונקציות דילוג 10 שניות בדיוק ואנימציית משוב
 let feedbackTimeout = null;
 function skipTime(seconds) {
     if (!elements.html5Player) return;
     const cur = elements.html5Player.currentTime || 0;
-    const dur = elements.html5Player.duration || Infinity;
-    elements.html5Player.currentTime = Math.max(0, Math.min(dur, cur + seconds));
+    const dur = elements.html5Player.duration;
     
-    showSkipFeedback(seconds > 0 ? `⏩ +${seconds} שניות` : `⏪ ${seconds} שניות`);
+    let target = cur + seconds;
+    if (dur && !isNaN(dur) && dur > 0) {
+        target = Math.max(0, Math.min(dur, target));
+    } else {
+        target = Math.max(0, target);
+    }
+
+    elements.html5Player.currentTime = target;
+    showSkipFeedback(seconds > 0 ? `⏩ +10 שניות` : `⏪ 10- שניות`);
 }
 
 function showSkipFeedback(text) {
@@ -402,9 +559,16 @@ function renderCleanEpisodes(seasonNum) {
         const card = document.createElement('div');
         card.className = `clean-episode-card ${ep.watched ? 'watched' : ''}`;
 
+        const hasResume = ep.timestamp && ep.timestamp > 15 && !ep.watched;
+        const resumeMins = hasResume ? Math.floor(ep.timestamp / 60) : 0;
+        const resumeSecs = hasResume ? ('0' + Math.floor(ep.timestamp % 60)).slice(-2) : '00';
+
         card.innerHTML = `
             <div class="ep-card-top">
-                <div class="ep-title-clean">פרק ${ep.episode}</div>
+                <div class="ep-title-clean">
+                    פרק ${ep.episode}
+                    ${hasResume ? `<span class="ep-resume-badge" title="עצרת בדקה ${resumeMins}:${resumeSecs}">⏱️ ${resumeMins}:${resumeSecs}</span>` : ''}
+                </div>
                 <div class="ep-card-icons">
                     <button class="icon-btn fav-btn ${ep.favorite ? 'active' : ''}" title="${ep.favorite ? 'הסר ממועדפים' : 'שמור במועדפים שאהבתי'}">
                         ⭐
@@ -416,7 +580,7 @@ function renderCleanEpisodes(seasonNum) {
             </div>
             <div class="ep-card-buttons">
                 ${ep.is_playable_in_browser ? `
-                    <button class="btn-bubble btn-bubble-primary btn-play-browser">צפי עכשיו ✨</button>
+                    <button class="btn-bubble btn-bubble-primary btn-play-browser">${hasResume ? 'המשך צפייה ⏱️' : 'צפי עכשיו ✨'}</button>
                 ` : ''}
                 <button class="btn-bubble btn-bubble-soft btn-play-vlc">נגן במחשב (VLC)</button>
             </div>
@@ -441,7 +605,7 @@ function renderCleanEpisodes(seasonNum) {
             ep.favorite = isFav;
             favBtn.classList.toggle('active', isFav);
             showCuteToast(isFav ? 'נוסף למועדפים שאהבת! ⭐' : 'הוסר מהמועדפים 🌸', 'info');
-            fetchLibraryData();
+            fetchLibraryData(true);
         };
 
         // כפתור נצפה 💖
@@ -453,18 +617,27 @@ function renderCleanEpisodes(seasonNum) {
             watchBtn.classList.toggle('active', isWatched);
             watchBtn.textContent = isWatched ? '💖' : '🤍';
             showCuteToast(isWatched ? 'סומן כנצפה! 💖' : 'הוסר מנצפה 🌸', 'info');
-            fetchLibraryData();
+            fetchLibraryData(true);
         };
 
         elements.episodesList.appendChild(card);
     });
 }
 
-// נגן וידאו מובנה ומהיר באיכות מקורית מלאה
+let nextEpCountdownTimer = null;
+let nextEpisodeTarget = null;
+let hasShownNextEpPrompt = false;
+let lastSavedProgress = 0;
+
+// נגן וידאו מובנה ומהיר באיכות מקורית מלאה (עם המשך צפייה ומעבר לפרק הבא)
 function openInBrowserPlayer(ep) {
     state.activeEpisodeForVLC = ep;
     state.currentPlayingEpisode = ep;
     state.playbackPlayDuration = 0;
+    hasShownNextEpPrompt = false;
+    nextEpisodeTarget = null;
+    lastSavedProgress = 0;
+    cancelNextEpisodeCountdown();
 
     clearInterval(state.playbackTimer);
     state.playbackTimer = setInterval(() => {
@@ -476,13 +649,153 @@ function openInBrowserPlayer(ep) {
     elements.playerTitle.textContent = `${ep.series} - פרק ${ep.episode}`;
     elements.html5Player.src = `/api/stream/${ep.id}`;
     elements.playerModal.classList.remove('hidden');
+
+    // רעיון 2: המשך צפייה מהשנייה המדויקת שנשמרה
+    const savedTime = ep.timestamp || 0;
+    const onLoadedMetadata = () => {
+        const dur = elements.html5Player.duration || 0;
+        if (savedTime > 8 && (!dur || savedTime < dur - 15)) {
+            elements.html5Player.currentTime = savedTime;
+            const mins = Math.floor(savedTime / 60);
+            const secs = ('0' + Math.floor(savedTime % 60)).slice(-2);
+            showCuteToast(`ממשיך מאיפה שעצרת (דקה ${mins}:${secs}) ⏱️`, 'info');
+        }
+    };
+    elements.html5Player.addEventListener('loadedmetadata', onLoadedMetadata, { once: true });
+
     elements.html5Player.play().catch(e => console.log('Autoplay:', e));
+}
+
+// שמירת מיקום צפייה מדויק בזמן אמת (רעיון 2)
+function handleProgressSaving() {
+    if (!elements.html5Player || elements.html5Player.paused || !state.currentPlayingEpisode) return;
+    const cur = elements.html5Player.currentTime || 0;
+    const dur = elements.html5Player.duration || 0;
+
+    // שומר כל ~3.5 שניות אם עברנו 5 שניות מתחילת הפרק
+    if (cur > 5 && Math.abs(cur - lastSavedProgress) >= 3.5) {
+        if (!dur || cur < dur - 15) {
+            lastSavedProgress = cur;
+            state.currentPlayingEpisode.timestamp = cur;
+            fetch('/api/progress', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: state.currentPlayingEpisode.id, timestamp: cur })
+            }).catch(() => {});
+        }
+    }
+}
+
+// מציאת הפרק הבא בסדרה (עונה נוכחית או עונה הבאה)
+function getNextEpisode(currentEp) {
+    if (!state.currentSeries || !state.currentSeries.seasons || !currentEp) return null;
+    const currentSeason = currentEp.season;
+    const seasonEps = state.currentSeries.seasons[currentSeason] || [];
+
+    const currentIndex = seasonEps.findIndex(e => String(e.id) === String(currentEp.id));
+    if (currentIndex !== -1 && currentIndex + 1 < seasonEps.length) {
+        return seasonEps[currentIndex + 1];
+    }
+
+    // אם זה הפרק האחרון בעונה, נבדוק עונה הבאה
+    const allSeasons = Object.keys(state.currentSeries.seasons).map(Number).sort((a, b) => a - b);
+    const nextSeasonIdx = allSeasons.indexOf(Number(currentSeason)) + 1;
+    if (nextSeasonIdx > 0 && nextSeasonIdx < allSeasons.length) {
+        const nextSeasonNum = allSeasons[nextSeasonIdx];
+        const nextSeasonEps = state.currentSeries.seasons[nextSeasonNum];
+        if (nextSeasonEps && nextSeasonEps.length > 0) {
+            return nextSeasonEps[0];
+        }
+    }
+    return null;
+}
+
+// בדיקה אם להציע מעבר לפרק הבא כשהסוף מתקרב (רעיון 1)
+function checkForNextEpisodePrompt() {
+    if (!elements.html5Player || !state.currentPlayingEpisode) return;
+    if (hasShownNextEpPrompt) return;
+
+    const dur = elements.html5Player.duration || 0;
+    const cur = elements.html5Player.currentTime || 0;
+
+    // הופעת חלון מעבר לפרק הבא כשיש 20 שניות או פחות לסוף הפרק
+    if (dur > 30 && cur >= dur - 20) {
+        triggerNextEpisodeCountdown();
+    }
+}
+
+function triggerNextEpisodeCountdown() {
+    if (hasShownNextEpPrompt) return;
+    const nextEp = getNextEpisode(state.currentPlayingEpisode);
+    if (!nextEp) return;
+
+    hasShownNextEpPrompt = true;
+    nextEpisodeTarget = nextEp;
+
+    elements.nextEpTitle.textContent = `${nextEp.series} - עונה ${nextEp.season} פרק ${nextEp.episode}`;
+    elements.nextEpOverlay.classList.remove('hidden');
+
+    let secondsLeft = 5;
+    elements.countdownNum.textContent = secondsLeft;
+
+    clearInterval(nextEpCountdownTimer);
+    nextEpCountdownTimer = setInterval(() => {
+        secondsLeft -= 1;
+        if (secondsLeft > 0) {
+            elements.countdownNum.textContent = secondsLeft;
+        } else {
+            clearInterval(nextEpCountdownTimer);
+            playNextEpisodeNow();
+        }
+    }, 1000);
+}
+
+function playNextEpisodeNow() {
+    clearInterval(nextEpCountdownTimer);
+    elements.nextEpOverlay.classList.add('hidden');
+
+    if (state.currentPlayingEpisode) {
+        // סימון הפרק הנוכחי כנצפה אוטומטית ואיפוס התקדמות
+        setEpisodeWatchedExplicit(state.currentPlayingEpisode.id, true);
+        fetch('/api/progress', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: state.currentPlayingEpisode.id, timestamp: 0 })
+        }).catch(() => {});
+    }
+
+    if (nextEpisodeTarget) {
+        const next = nextEpisodeTarget;
+        nextEpisodeTarget = null;
+        hasShownNextEpPrompt = false;
+        openInBrowserPlayer(next);
+        fetchLibraryData(true);
+    }
+}
+
+function cancelNextEpisodeCountdown() {
+    clearInterval(nextEpCountdownTimer);
+    if (elements.nextEpOverlay) {
+        elements.nextEpOverlay.classList.add('hidden');
+    }
+}
+
+function handleEpisodeEnded() {
+    const nextEp = getNextEpisode(state.currentPlayingEpisode);
+    if (nextEp && !hasShownNextEpPrompt) {
+        triggerNextEpisodeCountdown();
+    } else if (!nextEp) {
+        if (state.currentPlayingEpisode && !state.currentPlayingEpisode.watched) {
+            elements.watchedPromptModal.classList.remove('hidden');
+        }
+    }
 }
 
 // סגירת נגן עם שאלה אם לסמן כנצפה
 function tryClosePlayerWithPrompt() {
     elements.html5Player.pause();
     clearInterval(state.playbackTimer);
+    cancelNextEpisodeCountdown();
 
     const ep = state.currentPlayingEpisode;
     if (ep && !ep.watched) {
@@ -502,11 +815,14 @@ function tryClosePlayerWithPrompt() {
 
 function closePlayer() {
     elements.html5Player.pause();
+    cancelNextEpisodeCountdown();
     elements.html5Player.removeAttribute('src');
     elements.html5Player.load();
     elements.playerModal.classList.add('hidden');
     clearInterval(state.playbackTimer);
     state.currentPlayingEpisode = null;
+    hasShownNextEpPrompt = false;
+    nextEpisodeTarget = null;
 }
 
 // רינדור פרקים מועדפים
@@ -521,17 +837,25 @@ function renderFavoritesGrid(favs) {
     favs.forEach(ep => {
         const card = document.createElement('div');
         card.className = 'clean-episode-card';
+
+        const hasResume = ep.timestamp && ep.timestamp > 15 && !ep.watched;
+        const resumeMins = hasResume ? Math.floor(ep.timestamp / 60) : 0;
+        const resumeSecs = hasResume ? ('0' + Math.floor(ep.timestamp % 60)).slice(-2) : '00';
+
         card.innerHTML = `
             <div class="ep-card-top">
                 <div>
                     <h3 style="font-size: 18px; font-weight: 900;">${escapeHtml(ep.series)}</h3>
-                    <div style="font-size: 14px; color: var(--pastel-rose); font-weight: 800;">עונה ${ep.season} · פרק ${ep.episode}</div>
+                    <div style="font-size: 14px; color: var(--pastel-rose); font-weight: 800; display: flex; align-items: center; gap: 8px;">
+                        עונה ${ep.season} · פרק ${ep.episode}
+                        ${hasResume ? `<span class="ep-resume-badge" title="עצרת בדקה ${resumeMins}:${resumeSecs}">⏱️ ${resumeMins}:${resumeSecs}</span>` : ''}
+                    </div>
                 </div>
                 <button class="icon-btn fav-btn active" title="הסר ממועדפים">⭐</button>
             </div>
             <div class="ep-card-buttons">
                 ${ep.is_playable_in_browser ? `
-                    <button class="btn-bubble btn-bubble-primary btn-fav-play">צפי עכשיו ✨</button>
+                    <button class="btn-bubble btn-bubble-primary btn-fav-play">${hasResume ? 'המשך צפייה ⏱️' : 'צפי עכשיו ✨'}</button>
                 ` : ''}
                 <button class="btn-bubble btn-bubble-soft btn-fav-vlc">נגן במחשב (VLC)</button>
             </div>

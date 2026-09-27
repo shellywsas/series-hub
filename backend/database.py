@@ -6,7 +6,7 @@ DATA_FILE = os.path.join(os.path.dirname(__file__), 'watched.json')
 
 def load_watched_data() -> Dict[str, Any]:
     if not os.path.exists(DATA_FILE):
-        return {'watched_episodes': {}, 'favorites': {}, 'last_watched': None}
+        return {'watched_episodes': {}, 'favorites': {}, 'timestamps': {}, 'last_watched': None}
     try:
         with open(DATA_FILE, 'r', encoding='utf-8') as f:
             data = json.load(f)
@@ -14,9 +14,11 @@ def load_watched_data() -> Dict[str, Any]:
                 data['favorites'] = {}
             if 'watched_episodes' not in data:
                 data['watched_episodes'] = {}
+            if 'timestamps' not in data:
+                data['timestamps'] = {}
             return data
     except Exception:
-        return {'watched_episodes': {}, 'favorites': {}, 'last_watched': None}
+        return {'watched_episodes': {}, 'favorites': {}, 'timestamps': {}, 'last_watched': None}
 
 def save_watched_data(data: Dict[str, Any]):
     try:
@@ -41,6 +43,15 @@ def toggle_favorite(episode_id: str) -> bool:
     data.setdefault('favorites', {})[episode_id] = is_fav
     save_watched_data(data)
     return is_fav
+
+def save_progress(episode_id: str, timestamp: float):
+    data = load_watched_data()
+    data.setdefault('timestamps', {})[episode_id] = round(timestamp, 1)
+    save_watched_data(data)
+
+def get_progress(episode_id: str) -> float:
+    data = load_watched_data()
+    return data.get('timestamps', {}).get(episode_id, 0.0)
 
 def set_last_watched(episode_id: str, series_name: str, season: int, episode_num: Any):
     data = load_watched_data()
